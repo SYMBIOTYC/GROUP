@@ -23,12 +23,12 @@ AMPHETAMIN is a standalone product and MCP server. It authenticates the user at 
 
 ## 3. Trust boundaries
 
-1. AMPHETAMIN-to-GROUP: authenticated service identity, tenant/project authorization, request-size limits, schema validation, rate limits, stable idempotency.
+1. AMPHETAMIN-to-GROUP: private Cloudflare Service Binding only; AMPHETAMIN authenticates the external caller and derives tenant/project/actor/scopes server-side. GROUP has no public route and accepts the bounded principal assertion only on that internal path.
 2. GROUP-to-Worker: authenticated workload identity, short-lived registration epoch, attempt-bound lease/fencing token, allowlisted capabilities, bounded TaskRequest.
 3. Worker-to-GROUP: authenticated result/status messages; all payloads are untrusted and must be checked against current Job, Execution, Worker, lease, deadline, and output policy.
 4. GROUP-to-provider: least-privilege provider adapters with provider-enforced quota discovery; missing or stale capacity evidence fails closed.
 
-No caller-provided endpoint URL, command, credential, tenant ID, Worker ID, or policy claim may override trusted server-side configuration.
+No caller-provided endpoint URL, command, credential, tenant ID, Worker ID, or policy claim may override trusted server-side configuration. Principal assertion headers are not safe on public ingress; the private Service Binding boundary is mandatory.
 
 ## 4. Job lifecycle
 
