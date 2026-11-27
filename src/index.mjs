@@ -22,54 +22,36 @@ function correlationId(request) {
   return supplied && /^[A-Za-z0-9._:-]{1,128}$/.test(supplied) ? supplied : crypto.randomUUID();
 }
 
-async function authorize(request, env, scope, correlation) {
-  const authorization = request.headers.get("authorization");
-  if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) {
-    return { response: errorResponse(401, "AUTHENTICATION_REQUIRED", "A valid bearer credential is required.", correlation) };
+function authorize(request, scope, correlation) {
+  // GROUP is private. This assertion is trusted only when requests arrive
+  // over AMPHETAMIN's Cloudflare Service Binding. Never expose public routes.
+  if (request.headers.get("x-symbiotyc-caller") !== "amphetamin") {
+    return { response: errorResponse(401, "INTERNAL_GATEWAY_REQUIRED", "Requests must originate from the AMPHETAMIN service binding.", correlation) };
   }
-  if (!env?.AUTH_SERVICE || typeof env.AUTH_SERVICE.fetch !== "function") {
-    return { response: errorResponse(503, "IDENTITY_PROVIDER_UNAVAILABLE", "Trusted identity verification is not configured.", correlation) };
+  const encoded = request.headers.get("x-symbiotyc-principal") || "";
+  if (!encoded || encoded.length > 4096) {
+    return { response: errorResponse(401, "TRUSTED_PRINCIPAL_REQUIRED", "A bounded AMPHETAMIN principal assertion is required.", correlation) };
   }
-
-  let upstream;
+  let principal;
   try {
-    upstream = await env.AUTH_SERVICE.fetch(new Request("https://identity.internal/v1/verify", {
-      method: "POST",
-      headers: {
-        authorization,
-        "content-type": "application/json",
-        "x-required-scope": scope
-      },
-      body: JSON.stringify({ audience: SERVICE_NAME, required_scopes: [scope] })
-    }));
+    const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - base64.length % 4) % 4);
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    principal = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
-    return { response: errorResponse(503, "IDENTITY_PROVIDER_UNAVAILABLE", "Trusted identity verification is unavailable.", correlation) };
+    return { response: errorResponse(401, "INVALID_TRUSTED_PRINCIPAL", "The AMPHETAMIN principal assertion is invalid.", correlation) };
   }
-
-  if (upstream.status === 401 || upstream.status === 403) {
-    return { response: errorResponse(upstream.status, upstream.status === 401 ? "AUTHENTICATION_REQUIRED" : "FORBIDDEN", "The caller is not authorized for this operation.", correlation) };
-  }
-  if (!upstream.ok) {
-    return { response: errorResponse(503, "IDENTITY_PROVIDER_UNAVAILABLE", "Trusted identity verification failed.", correlation) };
-  }
-
-  let verified;
-  try {
-    verified = await upstream.json();
-  } catch {
-    return { response: errorResponse(503, "IDENTITY_PROVIDER_INVALID_RESPONSE", "Trusted identity provider returned an invalid response.", correlation) };
-  }
-  const principal = verified?.principal;
-  if (verified?.ok !== true || !principal ||
-      !["user", "service"].includes(principal.kind) ||
-      typeof principal.tenant_id !== "string" ||
-      typeof principal.project_id !== "string" ||
-      typeof principal.actor_id !== "string" ||
-      !Array.isArray(principal.scopes)) {
-    return { response: errorResponse(503, "IDENTITY_PROVIDER_INVALID_RESPONSE", "Trusted identity provider returned an incomplete principal.", correlation) };
+  if (!principal || !["user", "service"].includes(principal.kind) ||
+      typeof principal.tenant_id !== "string" || !principal.tenant_id ||
+      typeof principal.project_id !== "string" || !principal.project_id ||
+      typeof principal.actor_id !== "string" || !principal.actor_id ||
+      !Array.isArray(principal.scopes) ||
+      !principal.scopes.every((item) => typeof item === "string")) {
+    return { response: errorResponse(401, "INVALID_TRUSTED_PRINCIPAL", "The AMPHETAMIN principal assertion is incomplete.", correlation) };
   }
   if (!principal.scopes.includes(scope)) {
-    return { response: errorResponse(403, "FORBIDDEN", "The caller lacks the required scope.", correlation) };
+    return { response: errorResponse(403, "FORBIDDEN", "The principal lacks the required compute scope.", correlation) };
   }
   return { principal };
 }
@@ -337,21 +319,21 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/v1/jobs") {
-      const auth = await authorize(request, env, "compute:jobs:write", correlation);
+      const auth = authorize(request, "compute:jobs:write", correlation);
       if (auth.response) return auth.response;
       return createJob(request, env, auth.principal, correlation);
     }
 
     const getMatch = url.pathname.match(/^\/v1\/jobs\/([0-9a-f-]{36})$/i);
     if (request.method === "GET" && getMatch) {
-      const auth = await authorize(request, env, "compute:jobs:read", correlation);
+      const auth = authorize(request, "compute:jobs:read", correlation);
       if (auth.response) return auth.response;
       return getJob(env, auth.principal, getMatch[1], correlation);
     }
 
     const cancelMatch = url.pathname.match(/^\/v1\/jobs\/([0-9a-f-]{36})\/cancel$/i);
     if (request.method === "POST" && cancelMatch) {
-      const auth = await authorize(request, env, "compute:jobs:cancel", correlation);
+      const auth = authorize(request, "compute:jobs:cancel", correlation);
       if (auth.response) return auth.response;
       return cancelJob(env, auth.principal, cancelMatch[1], correlation);
     }

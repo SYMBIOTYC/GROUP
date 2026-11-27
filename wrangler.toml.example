@@ -3,14 +3,12 @@ main = "src/index.mjs"
 compatibility_date = "2026-11-28"
 workers_dev = false
 
-# Fill these values only after the GROUP runtime and identity integration pass
-# staging conformance. This example is intentionally not deployable as-is.
+# GROUP is private: workers_dev must stay disabled and no public route or
+# custom domain may be attached. AMPHETAMIN is the only intended Service
+# Binding caller. This example is intentionally not deployable until D1 exists.
 [[d1_databases]]
 binding = "DB"
 database_name = "symbiotyc-group-compute-state"
 database_id = "REPLACE_WITH_APPROVED_D1_DATABASE_ID"
 migrations_dir = "migrations"
 
-[[services]]
-binding = "AUTH_SERVICE"
-service = "REPLACE_WITH_VERIFIED_IDENTITY_SERVICE"

@@ -1,47 +1,53 @@
-# GROUP Trusted Identity Service Binding
+# AMPHETAMIN-to-GROUP Internal Service Binding Contract
 
-**Status:** Required integration contract; no identity service binding is currently configured or claimed.
+**Status:** Source contract; no AMPHETAMIN Worker or GROUP deployment is claimed.
 
-GROUP does not parse caller-provided tenant, project, actor, Worker, role, or scope claims. It delegates credential verification to a trusted Cloudflare Worker Service Binding named `AUTH_SERVICE`.
+## Trust model
 
-## Request
+AMPHETAMIN is the standalone MCP ingress and authenticates its external caller. GROUP is a private Compute Control Plane. There is no shared `API_TOKEN`, bearer secret, or credential transfer between AMPHETAMIN and GROUP.
 
-GROUP calls the service binding at the internal path `POST https://identity.internal/v1/verify` with:
+GROUP must be deployed with `workers_dev = false` and with no public routes or custom domains. The only intended ingress is a Cloudflare Worker Service Binding configured on the AMPHETAMIN Worker:
 
-- the original Authorization header, forwarded only over the trusted Worker Service Binding;
-- `x-required-scope` containing the endpoint-specific permission;
-- JSON body `{ "audience": "symbiotyc-group-control-plane", "required_scopes": ["..."] }`.
+```toml
+[[services]]
+binding = "GROUP"
+service = "symbiotyc-group-control-plane"
+```
 
-The raw credential is never copied into a URL, JSON body, database row, audit event, or response.
+The trust of the principal assertion below depends on this network boundary. The assertion headers are not cryptographic credentials and must never be accepted over a public route. If GROUP ever needs public ingress, replace this trust model with verified OIDC/JWT or a signed service assertion before exposing it.
 
-## Required response
+## Request assertion
 
-A successful verifier returns JSON:
+AMPHETAMIN calls GROUP through `env.GROUP.fetch(request)` and adds:
+
+- `x-symbiotyc-caller: amphetamin`
+- `x-symbiotyc-principal: <base64url(JSON principal)>`
+
+The decoded principal has this shape:
 
 ```json
 {
-  "ok": true,
-  "principal": {
-    "kind": "user",
-    "tenant_id": "tenant-from-trusted-identity",
-    "project_id": "project-from-trusted-identity",
-    "actor_id": "subject-from-trusted-identity",
-    "scopes": ["compute:jobs:write"]
-  }
+  "kind": "user",
+  "tenant_id": "tenant-from-authenticated-session",
+  "project_id": "authorized-project",
+  "actor_id": "authenticated-subject",
+  "scopes": ["compute:jobs:write", "compute:jobs:read", "compute:jobs:cancel"]
 }
 ```
 
-Allowed principal kinds for Job API calls are `user` and `service`. Worker endpoints will use a separate `worker` principal contract and cannot reuse user scopes.
+AMPHETAMIN must derive every principal field from its authenticated session and server-side tenant/project membership. It must not copy `tenant_id`, `project_id`, `actor_id`, role, or scope values from caller-supplied tool arguments.
 
-The verifier must validate issuer, audience, signature, expiry, not-before, tenant/project membership, and scope assignment before returning the principal. It must fail closed for unknown issuers, stale keys, invalid claims, and unavailable policy data.
+GROUP validates the caller marker, bounded assertion size, principal shape, and endpoint scope. It does not accept public bearer credentials.
 
-## Failure semantics
+## Security invariants
 
-- Missing Authorization: `401 AUTHENTICATION_REQUIRED`.
-- Invalid credential: `401 AUTHENTICATION_REQUIRED`.
-- Authenticated but insufficient scope: `403 FORBIDDEN`.
-- Missing binding, timeout, invalid verifier response, or verifier failure: `503 IDENTITY_PROVIDER_UNAVAILABLE` or `503 IDENTITY_PROVIDER_INVALID_RESPONSE`.
+- GROUP has no public route, workers.dev hostname, or custom-domain route.
+- Only the AMPHETAMIN Worker is configured with a Service Binding to GROUP.
+- The AMPHETAMIN MCP endpoint independently authenticates external clients and authorizes project membership.
+- Worker identity and Worker control remain exclusively inside GROUP; AMPHETAMIN cannot register, configure, or directly contact Workers.
+- No static API_TOKEN is shared, copied, returned, or written to GitHub/Wiki.
+- Service-binding configuration changes are reviewed as security-sensitive deployment changes.
 
 ## Deployment gate
 
-Do not deploy the GROUP Worker until the trusted identity service exists, its issuer/audience/scope policy is verified, and positive/negative authentication tests pass. Do not substitute a static `API_TOKEN`, user-supplied tenant ID, or caller-controlled claims.
+Before staging deployment, verify the GROUP Worker has no public ingress and `workers_dev=false`; verify AMPHETAMIN is the sole Service Binding consumer; verify missing/wrong caller marker, malformed principal, and missing scopes fail closed. Cloudflare Access is not enabled in the inspected account, so this internal service-binding design does not depend on Access. External AMPHETAMIN authentication remains a separate prerequisite.
