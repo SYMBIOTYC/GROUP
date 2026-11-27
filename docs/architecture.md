@@ -14,12 +14,18 @@ AMPHETAMIN is a standalone product and MCP server. It authenticates the user at 
 | Component | Owns | Explicitly does not own |
 |---|---|---|
 | AMPHETAMIN MCP | User-facing tools, JobIntent shaping, status/result presentation | Worker selection, Worker credentials, capacity, leases, Job state |
-| GROUP API | Authentication, tenant/project policy, Job and attempt state, idempotency, quotas, audit | Workload execution |
+| GROUP API | Private internal API, tenant/project policy, Job state, idempotency, quotas, audit | External user authentication, workload execution, direct Worker administration |
 | Worker Registry | Worker identity, registration epoch, capabilities, health, capacity observations, drain/quarantine/revoke | Job state or result acceptance |
 | Scheduler | Candidate eligibility, placement scoring, fairness, reservation request | Durable Job lifecycle |
 | Dispatcher | Attempt-bound delivery, ACK, cancellation delivery, reconciliation | Creating a new user intent |
 | Worker Runtime | Isolated execution, bounded resource use, result report | Declaring Job success or extending its own lease |
 | CLOUD-COMPUTE / CPU / VPS | Provider-specific execution capacity | Global policy or tenant authorization |
+
+## 3.1 AMPHETAMIN-to-GROUP internal boundary
+
+GROUP is not a public API. It is deployed with `workers_dev=false`, no public routes, and no custom domain. AMPHETAMIN is the only intended consumer through a Cloudflare Service Binding. AMPHETAMIN authenticates the external MCP caller and derives tenant/project/actor/scopes from its trusted session and membership policy. It then sends a bounded principal assertion to GROUP over the internal binding.
+
+The principal assertion headers are not cryptographic credentials. They are trusted only because the GROUP Worker has no public ingress and only AMPHETAMIN is configured with the Service Binding. Never expose those headers over public HTTP. This removes the need for a shared static `API_TOKEN` between AMPHETAMIN and GROUP. See [the internal Service Binding contract](auth-service-contract.md).
 
 ## 3. Trust boundaries
 
