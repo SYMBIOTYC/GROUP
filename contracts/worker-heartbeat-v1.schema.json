@@ -19,7 +19,7 @@
     },
     "schema_version": {
       "type": "string",
-      "pattern": "^1\\\\.[0-9]+$"
+      "pattern": "^1\\.[0-9]+$"
     },
     "registration_epoch": {
       "type": "string",
