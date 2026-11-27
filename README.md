@@ -56,4 +56,4 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 
 ## Implementation status
 
-This branch establishes the initial protocol schema package and conformance tests. It does not implement a running API, database, scheduler, dispatcher, Worker agent, provider adapter, or production deployment. Production dispatch remains disabled until the security, persistence, worker, quota, artifact, and end-to-end acceptance gates pass.
+The repository now includes the initial protocol schemas, Job API source core, D1 migration, private Service Binding contract, and passing Node/Python CI. It does not implement a deployed API, provisioned database, scheduler, dispatcher, Worker agent, provider adapter, or production deployment. Production dispatch remains disabled until the security, persistence, worker, quota, artifact, and end-to-end acceptance gates pass.
