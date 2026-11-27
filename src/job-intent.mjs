@@ -51,13 +51,14 @@ export function validateJobIntent(value) {
     return fail("INVALID_INPUT", "input must be a bounded JSON object.");
   }
   if (hasSensitiveKey(value.input)) {
-    return fail("SENSITIVE_INPUT_REJECTED", "Credential-like input fields are not accepted; use an approved secret-reference mechanism.");
+    return fail("SENSITIVE_INPUT_REJECTED", "Credential-like input fields are not accepted; secret references are not enabled in this runtime phase.");
   }
   if (new TextEncoder().encode(JSON.stringify(value.input)).byteLength > MAX_INPUT_BYTES) {
     return fail("INPUT_TOO_LARGE", "Job input exceeds the 64 KiB inline limit.");
   }
 
-  const rawConstraints = value.constraints ?? {};
+  if (!isObject(value.constraints)) return fail("INVALID_CONSTRAINTS", "constraints must be an object.");
+  const rawConstraints = value.constraints;
   if (!onlyKeys(rawConstraints, CONSTRAINT_KEYS)) return fail("INVALID_CONSTRAINTS", "constraints contains an unsupported field.");
   const constraints = {
     worker_pool: rawConstraints.worker_pool,
@@ -72,7 +73,8 @@ export function validateJobIntent(value) {
     return fail("INVALID_WORKER_POOL", "worker_pool is not a supported execution pool.");
   }
   if (!Array.isArray(constraints.required_capabilities) || constraints.required_capabilities.length > 32 ||
-      !constraints.required_capabilities.every((item) => typeof item === "string" && item.length > 0 && item.length <= 64)) {
+      !constraints.required_capabilities.every((item) => typeof item === "string" && item.length > 0 && item.length <= 64) ||
+      new Set(constraints.required_capabilities).size !== constraints.required_capabilities.length) {
     return fail("INVALID_CAPABILITIES", "required_capabilities must contain at most 32 bounded strings.");
   }
   if (!boundedInteger(constraints.cpu_millis, 1, 65536) ||
@@ -90,7 +92,8 @@ export function validateJobIntent(value) {
   }
   if (value.output_policy.media_types !== undefined &&
       (!Array.isArray(value.output_policy.media_types) || value.output_policy.media_types.length > 32 ||
-       !value.output_policy.media_types.every((item) => typeof item === "string" && item.length <= 128))) {
+       !value.output_policy.media_types.every((item) => typeof item === "string" && item.length > 0 && item.length <= 128) ||
+       new Set(value.output_policy.media_types).size !== value.output_policy.media_types.length)) {
     return fail("INVALID_OUTPUT_POLICY", "media_types must be a bounded string array.");
   }
   if (value.deadline_at !== undefined) {
