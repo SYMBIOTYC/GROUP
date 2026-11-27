@@ -29,6 +29,18 @@ test("accepts a bounded data-only JobIntent", () => {
   assert.equal(result.value.constraints.max_attempts, 2);
 });
 
+test("requires constraints to be an object", () => {
+  const intent = validIntent();
+  delete intent.constraints;
+  assert.equal(validateJobIntent(intent).ok, false);
+});
+
+test("rejects duplicate required capabilities", () => {
+  const intent = validIntent();
+  intent.constraints.required_capabilities = ["cpu", "cpu"];
+  assert.equal(validateJobIntent(intent).ok, false);
+});
+
 test("rejects caller-supplied tenant and actor identity", () => {
   const intent = validIntent();
   intent.tenant_id = "attacker-tenant";
