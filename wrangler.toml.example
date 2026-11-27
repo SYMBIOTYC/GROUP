@@ -2,10 +2,12 @@ name = "symbiotyc-group-control-plane"
 main = "src/index.mjs"
 compatibility_date = "2026-11-28"
 workers_dev = false
+preview_urls = false
 
-# GROUP is private: workers_dev must stay disabled and no public route or
-# custom domain may be attached. AMPHETAMIN is the only intended Service
-# Binding caller. This example is intentionally not deployable until D1 exists.
+# GROUP is private: workers_dev and preview_urls must stay disabled; attach no
+# public routes or custom domains. Do not publish deployment/version URLs.
+# AMPHETAMIN is the only intended Service Binding caller. This example is
+# intentionally not deployable until D1 exists.
 [[d1_databases]]
 binding = "DB"
 database_name = "symbiotyc-group-compute-state"
