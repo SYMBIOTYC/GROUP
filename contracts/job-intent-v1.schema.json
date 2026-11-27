@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.symbiotyc.dev/compute/v1/job-intent.schema.json",
+  "title": "Symbiotyc Compute JobIntent v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "schema_version",
+    "operation_id",
+    "input",
+    "constraints",
+    "output_policy"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "symbiotyc.compute.v1"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\\\.[0-9]+$"
+    },
+    "operation_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{1,127}$"
+    },
+    "input": {
+      "type": "object",
+      "maxProperties": 128
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "worker_pool": {
+          "enum": [
+            "CLOUD-COMPUTE",
+            "CLOUD-CPU",
+            "CLOUD-VPS"
+          ]
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "cpu_millis": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65536
+        },
+        "memory_mib": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 1048576
+        },
+        "ephemeral_disk_mib": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 1048576
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      }
+    },
+    "output_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "max_bytes"
+      ],
+      "properties": {
+        "format": {
+          "enum": [
+            "json",
+            "text",
+            "binary"
+          ]
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1073741824
+        },
+        "media_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "maxItems": 32
+        }
+      }
+    },
+    "deadline_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "client_reference": {
+      "type": "string",
+      "maxLength": 128
+    }
+  }
+}

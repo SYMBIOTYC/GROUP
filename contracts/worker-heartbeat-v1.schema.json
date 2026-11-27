@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.symbiotyc.dev/compute/v1/worker-heartbeat.schema.json",
+  "title": "Symbiotyc Compute Worker Heartbeat v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "schema_version",
+    "registration_epoch",
+    "sequence",
+    "observed_at",
+    "health",
+    "capacity"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "symbiotyc.compute.v1"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\\\.[0-9]+$"
+    },
+    "registration_epoch": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "health": {
+      "enum": [
+        "healthy",
+        "degraded",
+        "unhealthy"
+      ]
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "available_cpu_millis",
+        "available_memory_mib",
+        "available_disk_mib",
+        "running_executions"
+      ],
+      "properties": {
+        "available_cpu_millis": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_memory_mib": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "available_disk_mib": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "running_executions": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "agent_version": {
+      "type": "string",
+      "maxLength": 64
+    }
+  }
+}

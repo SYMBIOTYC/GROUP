@@ -1,0 +1,31 @@
+name: Compute protocol contracts
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  schema-conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Install contract test dependency
+        run: python -m pip install -r requirements-dev.txt
+      - name: Validate JSON syntax
+        run: |
+          for file in contracts/*.schema.json; do
+            python -m json.tool "$file" >/dev/null
+          done
+      - name: Run schema conformance tests
+        run: python -m unittest discover -s tests -v

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.symbiotyc.dev/compute/v1/worker-registration.schema.json",
+  "title": "Symbiotyc Compute Worker Registration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "schema_version",
+    "worker_pool",
+    "provider",
+    "region",
+    "runtime",
+    "capabilities",
+    "capacity",
+    "supported_protocols"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "symbiotyc.compute.v1"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\\\.[0-9]+$"
+    },
+    "worker_pool": {
+      "enum": [
+        "CLOUD-COMPUTE",
+        "CLOUD-CPU",
+        "CLOUD-VPS"
+      ]
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "region": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "os",
+        "architecture",
+        "version"
+      ],
+      "properties": {
+        "os": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "architecture": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 64
+      },
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cpu_millis",
+        "memory_mib",
+        "ephemeral_disk_mib",
+        "max_concurrency"
+      ],
+      "properties": {
+        "cpu_millis": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        },
+        "memory_mib": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 4194304
+        },
+        "ephemeral_disk_mib": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 4194304
+        },
+        "max_concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        }
+      }
+    },
+    "supported_protocols": {
+      "type": "array",
+      "items": {
+        "const": "symbiotyc.compute.v1"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "agent_version": {
+      "type": "string",
+      "maxLength": 64
+    }
+  }
+}
