@@ -155,6 +155,34 @@ async function createJob(request, env, principal, correlation) {
 
   const intent = validation.value;
   const { tenant_id: tenantId, project_id: projectId, actor_id: actorId } = principal;
+  const requestHash = await sha256Hex(canonicalJson(intent));
+  const idempotencyHash = await sha256Hex(idempotencyKey);
+
+  // Replay is resolved before policy/quota checks: a previously accepted
+  // request must remain replayable even if the project is now at quota.
+  try {
+    const existing = await env.DB.prepare(
+      "SELECT request_hash, job_id FROM idempotency_records WHERE tenant_id = ? AND project_id = ? AND operation_id = ? AND idempotency_key_hash = ?"
+    ).bind(tenantId, projectId, intent.operation_id, idempotencyHash).first();
+    if (existing) {
+      if (existing.request_hash !== requestHash) {
+        return errorResponse(409, "IDEMPOTENCY_CONFLICT", "The Idempotency-Key was already used with a different JobIntent.", correlation);
+      }
+      if (!existing.job_id) {
+        return errorResponse(503, "JOB_ACCEPTANCE_UNKNOWN", "The durable acceptance outcome is unresolved; retry only with the same Idempotency-Key.", correlation);
+      }
+      const existingRow = await env.DB.prepare(
+        "SELECT job_id, operation_id, state, record_version, created_at, updated_at, deadline_at, correlation_id FROM jobs WHERE job_id = ? AND tenant_id = ? AND project_id = ?"
+      ).bind(existing.job_id, tenantId, projectId).first();
+      if (!existingRow) {
+        return errorResponse(503, "JOB_RECORD_UNAVAILABLE", "The previously accepted Job record could not be read back.", correlation);
+      }
+      return jsonResponse(202, { ...parseJobRow(existingRow), status_url: `/v1/jobs/${existingRow.job_id}`, replayed: true });
+    }
+  } catch {
+    return errorResponse(503, "DURABLE_READ_FAILED", "The idempotency record could not be read.", correlation);
+  }
+
   let policy;
   let quota;
   try {
@@ -181,12 +209,7 @@ async function createJob(request, env, principal, correlation) {
       intent.constraints.timeout_seconds > timeoutLimit) {
     return errorResponse(422, "RESOURCE_LIMIT_EXCEEDED", "Requested resources exceed the operation or project policy.", correlation);
   }
-  if (quota.active_jobs >= quota.max_active_jobs) {
-    return errorResponse(429, "QUOTA_EXCEEDED", "The project has reached its active Job quota.", correlation);
-  }
 
-  const requestHash = await sha256Hex(canonicalJson(intent));
-  const idempotencyHash = await sha256Hex(idempotencyKey);
   const jobId = crypto.randomUUID();
   const now = new Date().toISOString();
   const constraintsJson = JSON.stringify(intent.constraints);
