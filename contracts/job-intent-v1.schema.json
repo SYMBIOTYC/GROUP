@@ -18,7 +18,7 @@
     },
     "schema_version": {
       "type": "string",
-      "pattern": "^1\\\\.[0-9]+$"
+      "pattern": "^1\\.[0-9]+$"
     },
     "operation_id": {
       "type": "string",
