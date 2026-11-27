@@ -120,6 +120,64 @@ class ComputeCoreMigrationTests(unittest.TestCase):
         )
         self.assertEqual(self.db.execute("SELECT active_jobs FROM project_quotas").fetchone()[0], 0)
 
+    def test_queued_job_cancellation_is_terminal_and_releases_quota(self):
+        self.accept("key-hash-1", "request-hash-1", "job-1")
+        now = "2026-11-28T00:01:00Z"
+        with self.db:
+            self.db.execute(
+                "UPDATE jobs SET state = CASE WHEN state = 'QUEUED' AND NOT EXISTS "
+                "(SELECT 1 FROM executions e WHERE e.job_id = jobs.job_id) THEN 'CANCELLED' "
+                "ELSE 'CANCEL_REQUESTED' END, record_version = record_version + 1, updated_at = ? "
+                "WHERE job_id = ? AND state IN ('QUEUED', 'SCHEDULED', 'DISPATCHED', 'RUNNING')",
+                (now, "job-1"),
+            )
+            self.db.execute(
+                "INSERT INTO audit_events (event_id, tenant_id, project_id, actor_id, action, resource_id, correlation_id, created_at) "
+                "SELECT ?, tenant_id, project_id, ?, CASE WHEN state = 'CANCELLED' THEN 'JOB_CANCELLED' "
+                "ELSE 'JOB_CANCEL_REQUESTED' END, job_id, ?, ? FROM jobs WHERE job_id = ? AND changes() = 1",
+                ("cancel-audit", "actor-1", "corr-1", now, "job-1"),
+            )
+            self.db.execute(
+                "INSERT INTO outbox_events (event_id, tenant_id, project_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload_json, created_at, published_at) "
+                "SELECT ?, tenant_id, project_id, 'JOB', job_id, record_version, "
+                "CASE WHEN state = 'CANCELLED' THEN 'JOB_CANCELLED' ELSE 'JOB_CANCEL_REQUESTED' END, "
+                "json_object('job_id', job_id, 'state', state), ?, NULL FROM jobs WHERE job_id = ? AND changes() = 1",
+                ("cancel-outbox", now, "job-1"),
+            )
+        self.assertEqual(self.db.execute("SELECT state FROM jobs WHERE job_id = 'job-1'").fetchone()[0], "CANCELLED")
+        self.assertEqual(self.db.execute("SELECT active_jobs FROM project_quotas").fetchone()[0], 0)
+        self.assertEqual(self.db.execute("SELECT action FROM audit_events WHERE event_id = 'cancel-audit'").fetchone()[0], "JOB_CANCELLED")
+        self.assertEqual(self.db.execute("SELECT event_type FROM outbox_events WHERE event_id = 'cancel-outbox'").fetchone()[0], "JOB_CANCELLED")
+
+    def test_running_job_cancellation_remains_a_request_until_worker_acknowledges(self):
+        self.accept("key-hash-1", "request-hash-1", "job-1")
+        self.db.execute("UPDATE jobs SET state = 'RUNNING' WHERE job_id = 'job-1'")
+        now = "2026-11-28T00:01:00Z"
+        with self.db:
+            self.db.execute(
+                "UPDATE jobs SET state = CASE WHEN state = 'QUEUED' AND NOT EXISTS "
+                "(SELECT 1 FROM executions e WHERE e.job_id = jobs.job_id) THEN 'CANCELLED' "
+                "ELSE 'CANCEL_REQUESTED' END, record_version = record_version + 1, updated_at = ? "
+                "WHERE job_id = ? AND state IN ('QUEUED', 'SCHEDULED', 'DISPATCHED', 'RUNNING')",
+                (now, "job-1"),
+            )
+            self.db.execute(
+                "INSERT INTO audit_events (event_id, tenant_id, project_id, actor_id, action, resource_id, correlation_id, created_at) "
+                "SELECT ?, tenant_id, project_id, ?, CASE WHEN state = 'CANCELLED' THEN 'JOB_CANCELLED' "
+                "ELSE 'JOB_CANCEL_REQUESTED' END, job_id, ?, ? FROM jobs WHERE job_id = ? AND changes() = 1",
+                ("cancel-audit", "actor-1", "corr-1", now, "job-1"),
+            )
+            self.db.execute(
+                "INSERT INTO outbox_events (event_id, tenant_id, project_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload_json, created_at, published_at) "
+                "SELECT ?, tenant_id, project_id, 'JOB', job_id, record_version, "
+                "CASE WHEN state = 'CANCELLED' THEN 'JOB_CANCELLED' ELSE 'JOB_CANCEL_REQUESTED' END, "
+                "json_object('job_id', job_id, 'state', state), ?, NULL FROM jobs WHERE job_id = ? AND changes() = 1",
+                ("cancel-outbox", now, "job-1"),
+            )
+        self.assertEqual(self.db.execute("SELECT state FROM jobs WHERE job_id = 'job-1'").fetchone()[0], "CANCEL_REQUESTED")
+        self.assertEqual(self.db.execute("SELECT active_jobs FROM project_quotas").fetchone()[0], 1)
+        self.assertEqual(self.db.execute("SELECT event_type FROM outbox_events WHERE event_id = 'cancel-outbox'").fetchone()[0], "JOB_CANCEL_REQUESTED")
+
     def test_audit_events_are_append_only(self):
         self.accept("key-hash-1", "request-hash-1", "job-1")
         with self.assertRaises(sqlite3.IntegrityError):
