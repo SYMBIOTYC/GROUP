@@ -74,6 +74,34 @@ async function authorize(request, env, scope, correlation) {
   return { principal };
 }
 
+async function readTextLimited(request, maxBytes) {
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new RangeError("request body too large");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+
 function databaseUnavailable(env, correlation) {
   return !env?.DB || typeof env.DB.prepare !== "function" || typeof env.DB.batch !== "function"
     ? errorResponse(503, "DATABASE_UNAVAILABLE", "Durable Job storage is not configured.", correlation)
@@ -111,13 +139,13 @@ async function createJob(request, env, principal, correlation) {
   }
   let body;
   try {
-    const raw = await request.text();
-    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) {
+    const raw = await readTextLimited(request, MAX_BODY_BYTES);
+    body = JSON.parse(raw);
+  } catch (error) {
+    if (error instanceof RangeError) {
       return errorResponse(413, "REQUEST_TOO_LARGE", "Request body exceeds the 1 MiB limit.", correlation);
     }
-    body = JSON.parse(raw);
-  } catch {
-    return errorResponse(400, "INVALID_JSON", "Request body must contain valid JSON.", correlation);
+    return errorResponse(400, "INVALID_JSON", "Request body must contain valid UTF-8 JSON.", correlation);
   }
   const validation = validateJobIntent(body);
   if (!validation.ok) return errorResponse(422, validation.error.code, validation.error.message, correlation);
@@ -166,8 +194,8 @@ async function createJob(request, env, principal, correlation) {
         "INSERT OR IGNORE INTO idempotency_records (tenant_id, project_id, operation_id, idempotency_key_hash, request_hash, job_id, created_at) VALUES (?, ?, ?, ?, ?, NULL, ?)"
       ).bind(tenantId, projectId, intent.operation_id, idempotencyHash, requestHash, now),
       env.DB.prepare(
-        "UPDATE project_quotas SET active_jobs = active_jobs + 1, updated_at = ? WHERE tenant_id = ? AND project_id = ? AND active_jobs < max_active_jobs AND changes() = 1 AND EXISTS (SELECT 1 FROM project_operation_policies p WHERE p.tenant_id = ? AND p.project_id = ? AND p.operation_id = ? AND p.enabled = 1 AND ? <= p.max_cpu_millis_per_job AND ? <= p.max_memory_mib_per_job AND ? <= p.max_timeout_seconds)"
-      ).bind(now, tenantId, projectId, tenantId, projectId, intent.operation_id, intent.constraints.cpu_millis, intent.constraints.memory_mib, intent.constraints.timeout_seconds),
+        "UPDATE project_quotas SET active_jobs = active_jobs + 1, updated_at = ? WHERE tenant_id = ? AND project_id = ? AND active_jobs < max_active_jobs AND ? <= max_cpu_millis_per_job AND ? <= max_memory_mib_per_job AND ? <= max_timeout_seconds AND changes() = 1 AND EXISTS (SELECT 1 FROM project_operation_policies p WHERE p.tenant_id = ? AND p.project_id = ? AND p.operation_id = ? AND p.enabled = 1 AND ? <= p.max_cpu_millis_per_job AND ? <= p.max_memory_mib_per_job AND ? <= p.max_timeout_seconds)"
+      ).bind(now, tenantId, projectId, intent.constraints.cpu_millis, intent.constraints.memory_mib, intent.constraints.timeout_seconds, tenantId, projectId, intent.operation_id, intent.constraints.cpu_millis, intent.constraints.memory_mib, intent.constraints.timeout_seconds),
       env.DB.prepare(
         "INSERT INTO jobs (job_id, tenant_id, project_id, actor_id, operation_id, input_json, constraints_json, output_policy_json, state, record_version, request_digest, correlation_id, created_at, updated_at, deadline_at) SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', 1, ?, ?, ?, ?, ? WHERE changes() = 1"
       ).bind(jobId, tenantId, projectId, actorId, intent.operation_id, inputJson, constraintsJson, outputPolicyJson, requestHash, correlation, now, now, intent.deadline_at || null),
@@ -178,7 +206,7 @@ async function createJob(request, env, principal, correlation) {
         "INSERT INTO audit_events (event_id, tenant_id, project_id, actor_id, action, resource_id, request_digest, correlation_id, created_at) SELECT ?, ?, ?, ?, 'JOB_CREATED', ?, ?, ?, ? WHERE changes() = 1"
       ).bind(eventId, tenantId, projectId, actorId, jobId, requestHash, correlation, now),
       env.DB.prepare(
-        "INSERT INTO outbox_events (event_id, tenant_id, project_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload_json, created_at) SELECT ?, ?, ?, 'JOB', ?, 1, 'JOB_ACCEPTED', ?, ? WHERE changes() = 1"
+        "INSERT INTO outbox_events (event_id, tenant_id, project_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload_json, created_at, published_at) SELECT ?, ?, ?, 'JOB', ?, 1, 'JOB_ACCEPTED', ?, ?, NULL WHERE changes() = 1"
       ).bind(crypto.randomUUID(), tenantId, projectId, jobId, JSON.stringify({ job_id: jobId, state: "QUEUED", operation_id: intent.operation_id }), now),
       env.DB.prepare(
         "DELETE FROM idempotency_records WHERE tenant_id = ? AND project_id = ? AND operation_id = ? AND idempotency_key_hash = ? AND job_id IS NULL"
@@ -232,7 +260,7 @@ async function cancelJob(env, principal, jobId, correlation) {
         "INSERT INTO audit_events (event_id, tenant_id, project_id, actor_id, action, resource_id, correlation_id, created_at) SELECT ?, ?, ?, ?, 'JOB_CANCEL_REQUESTED', ?, ?, ? WHERE changes() = 1"
       ).bind(eventId, principal.tenant_id, principal.project_id, principal.actor_id, jobId, correlation, now),
       env.DB.prepare(
-        "INSERT INTO outbox_events (event_id, tenant_id, project_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload_json, created_at) SELECT ?, ?, ?, 'JOB', ?, (SELECT record_version FROM jobs WHERE job_id = ?), 'JOB_CANCEL_REQUESTED', ?, ? WHERE changes() = 1"
+        "INSERT INTO outbox_events (event_id, tenant_id, project_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload_json, created_at, published_at) SELECT ?, ?, ?, 'JOB', ?, (SELECT record_version FROM jobs WHERE job_id = ?), 'JOB_CANCEL_REQUESTED', ?, ?, NULL WHERE changes() = 1"
       ).bind(crypto.randomUUID(), principal.tenant_id, principal.project_id, jobId, jobId, JSON.stringify({ job_id: jobId, state: "CANCEL_REQUESTED" }), now)
     ]);
   } catch {
