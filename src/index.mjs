@@ -155,15 +155,21 @@ async function createJob(request, env, principal, correlation) {
 
   const intent = validation.value;
   const { tenant_id: tenantId, project_id: projectId, actor_id: actorId } = principal;
-  const policy = await env.DB.prepare(
-    "SELECT enabled, max_cpu_millis_per_job, max_memory_mib_per_job, max_timeout_seconds FROM project_operation_policies WHERE tenant_id = ? AND project_id = ? AND operation_id = ?"
-  ).bind(tenantId, projectId, intent.operation_id).first();
+  let policy;
+  let quota;
+  try {
+    policy = await env.DB.prepare(
+      "SELECT enabled, max_cpu_millis_per_job, max_memory_mib_per_job, max_timeout_seconds FROM project_operation_policies WHERE tenant_id = ? AND project_id = ? AND operation_id = ?"
+    ).bind(tenantId, projectId, intent.operation_id).first();
+    quota = await env.DB.prepare(
+      "SELECT active_jobs, max_active_jobs, max_cpu_millis_per_job, max_memory_mib_per_job, max_timeout_seconds FROM project_quotas WHERE tenant_id = ? AND project_id = ?"
+    ).bind(tenantId, projectId).first();
+  } catch {
+    return errorResponse(503, "DATABASE_READ_FAILED", "Project policy and quota state could not be read.", correlation);
+  }
   if (!policy || policy.enabled !== 1) {
     return errorResponse(403, "OPERATION_NOT_ALLOWED", "The requested operation is not enabled for this project.", correlation);
   }
-  const quota = await env.DB.prepare(
-    "SELECT active_jobs, max_active_jobs, max_cpu_millis_per_job, max_memory_mib_per_job, max_timeout_seconds FROM project_quotas WHERE tenant_id = ? AND project_id = ?"
-  ).bind(tenantId, projectId).first();
   if (!quota) {
     return errorResponse(403, "QUOTA_NOT_CONFIGURED", "No compute quota is configured for this project.", correlation);
   }
@@ -216,9 +222,20 @@ async function createJob(request, env, principal, correlation) {
     return errorResponse(503, "DURABLE_WRITE_FAILED", "Job acceptance could not be durably committed; retry only with the same Idempotency-Key.", correlation);
   }
 
-  const idempotency = await env.DB.prepare(
-    "SELECT request_hash, job_id FROM idempotency_records WHERE tenant_id = ? AND project_id = ? AND operation_id = ? AND idempotency_key_hash = ?"
-  ).bind(tenantId, projectId, intent.operation_id, idempotencyHash).first();
+  let idempotency;
+  let row;
+  try {
+    idempotency = await env.DB.prepare(
+      "SELECT request_hash, job_id FROM idempotency_records WHERE tenant_id = ? AND project_id = ? AND operation_id = ? AND idempotency_key_hash = ?"
+    ).bind(tenantId, projectId, intent.operation_id, idempotencyHash).first();
+    if (idempotency?.job_id) {
+      row = await env.DB.prepare(
+        "SELECT job_id, operation_id, state, record_version, created_at, updated_at, deadline_at, correlation_id FROM jobs WHERE job_id = ? AND tenant_id = ? AND project_id = ?"
+      ).bind(idempotency.job_id, tenantId, projectId).first();
+    }
+  } catch {
+    return errorResponse(503, "DURABLE_READ_FAILED", "The durable Job acceptance record could not be read back.", correlation);
+  }
   if (!idempotency) {
     return errorResponse(429, "QUOTA_OR_POLICY_CHANGED", "Project quota or operation policy changed before the Job could be accepted.", correlation);
   }
@@ -228,9 +245,6 @@ async function createJob(request, env, principal, correlation) {
   if (!idempotency.job_id) {
     return errorResponse(503, "JOB_ACCEPTANCE_UNKNOWN", "The durable acceptance outcome is unresolved; retry only with the same Idempotency-Key.", correlation);
   }
-  const row = await env.DB.prepare(
-    "SELECT job_id, operation_id, state, record_version, created_at, updated_at, deadline_at, correlation_id FROM jobs WHERE job_id = ? AND tenant_id = ? AND project_id = ?"
-  ).bind(idempotency.job_id, tenantId, projectId).first();
   if (!row) return errorResponse(503, "JOB_RECORD_UNAVAILABLE", "The accepted Job record could not be read back.", correlation);
   const replayed = idempotency.job_id !== jobId;
   return jsonResponse(202, { ...parseJobRow(row), status_url: `/v1/jobs/${row.job_id}`, replayed });
@@ -239,9 +253,14 @@ async function createJob(request, env, principal, correlation) {
 async function getJob(env, principal, jobId, correlation) {
   const dbError = databaseUnavailable(env, correlation);
   if (dbError) return dbError;
-  const row = await env.DB.prepare(
-    "SELECT job_id, operation_id, state, record_version, created_at, updated_at, deadline_at, correlation_id FROM jobs WHERE job_id = ? AND tenant_id = ? AND project_id = ?"
-  ).bind(jobId, principal.tenant_id, principal.project_id).first();
+  let row;
+  try {
+    row = await env.DB.prepare(
+      "SELECT job_id, operation_id, state, record_version, created_at, updated_at, deadline_at, correlation_id FROM jobs WHERE job_id = ? AND tenant_id = ? AND project_id = ?"
+    ).bind(jobId, principal.tenant_id, principal.project_id).first();
+  } catch {
+    return errorResponse(503, "DATABASE_READ_FAILED", "Job state could not be read.", correlation);
+  }
   if (!row) return errorResponse(404, "JOB_NOT_FOUND", "The requested Job was not found.", correlation);
   return jsonResponse(200, parseJobRow(row));
 }
@@ -254,26 +273,31 @@ async function cancelJob(env, principal, jobId, correlation) {
   try {
     await env.DB.batch([
       env.DB.prepare(
-        "UPDATE jobs SET state = 'CANCEL_REQUESTED', record_version = record_version + 1, updated_at = ? WHERE job_id = ? AND tenant_id = ? AND project_id = ? AND state IN ('QUEUED', 'SCHEDULED', 'DISPATCHED', 'RUNNING')"
+        "UPDATE jobs SET state = CASE WHEN state = 'QUEUED' AND NOT EXISTS (SELECT 1 FROM executions e WHERE e.job_id = jobs.job_id) THEN 'CANCELLED' ELSE 'CANCEL_REQUESTED' END, record_version = record_version + 1, updated_at = ? WHERE job_id = ? AND tenant_id = ? AND project_id = ? AND state IN ('QUEUED', 'SCHEDULED', 'DISPATCHED', 'RUNNING')"
       ).bind(now, jobId, principal.tenant_id, principal.project_id),
       env.DB.prepare(
-        "INSERT INTO audit_events (event_id, tenant_id, project_id, actor_id, action, resource_id, correlation_id, created_at) SELECT ?, ?, ?, ?, 'JOB_CANCEL_REQUESTED', ?, ?, ? WHERE changes() = 1"
-      ).bind(eventId, principal.tenant_id, principal.project_id, principal.actor_id, jobId, correlation, now),
+        "INSERT INTO audit_events (event_id, tenant_id, project_id, actor_id, action, resource_id, correlation_id, created_at) SELECT ?, tenant_id, project_id, ?, CASE WHEN state = 'CANCELLED' THEN 'JOB_CANCELLED' ELSE 'JOB_CANCEL_REQUESTED' END, job_id, ?, ? FROM jobs WHERE job_id = ? AND changes() = 1"
+      ).bind(eventId, principal.actor_id, correlation, now, jobId),
       env.DB.prepare(
-        "INSERT INTO outbox_events (event_id, tenant_id, project_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload_json, created_at, published_at) SELECT ?, ?, ?, 'JOB', ?, (SELECT record_version FROM jobs WHERE job_id = ?), 'JOB_CANCEL_REQUESTED', ?, ?, NULL WHERE changes() = 1"
-      ).bind(crypto.randomUUID(), principal.tenant_id, principal.project_id, jobId, jobId, JSON.stringify({ job_id: jobId, state: "CANCEL_REQUESTED" }), now)
+        "INSERT INTO outbox_events (event_id, tenant_id, project_id, aggregate_type, aggregate_id, aggregate_version, event_type, payload_json, created_at, published_at) SELECT ?, tenant_id, project_id, 'JOB', job_id, record_version, CASE WHEN state = 'CANCELLED' THEN 'JOB_CANCELLED' ELSE 'JOB_CANCEL_REQUESTED' END, json_object('job_id', job_id, 'state', state), ?, NULL FROM jobs WHERE job_id = ? AND changes() = 1"
+      ).bind(crypto.randomUUID(), now, jobId)
     ]);
   } catch {
     return errorResponse(503, "DURABLE_WRITE_FAILED", "Cancellation request could not be durably committed.", correlation);
   }
-  const row = await env.DB.prepare(
-    "SELECT job_id, operation_id, state, record_version, created_at, updated_at, deadline_at, correlation_id FROM jobs WHERE job_id = ? AND tenant_id = ? AND project_id = ?"
-  ).bind(jobId, principal.tenant_id, principal.project_id).first();
-  if (!row) return errorResponse(404, "JOB_NOT_FOUND", "The requested Job was not found.", correlation);
-  if (TERMINAL_STATES.has(row.state)) {
-    return errorResponse(409, "JOB_ALREADY_TERMINAL", "A terminal Job cannot be cancelled.", correlation);
+  let row;
+  try {
+    row = await env.DB.prepare(
+      "SELECT job_id, operation_id, state, record_version, created_at, updated_at, deadline_at, correlation_id FROM jobs WHERE job_id = ? AND tenant_id = ? AND project_id = ?"
+    ).bind(jobId, principal.tenant_id, principal.project_id).first();
+  } catch {
+    return errorResponse(503, "DATABASE_READ_FAILED", "Cancellation outcome could not be read.", correlation);
   }
-  return jsonResponse(202, parseJobRow(row));
+  if (!row) return errorResponse(404, "JOB_NOT_FOUND", "The requested Job was not found.", correlation);
+  if (row.state === "SUCCEEDED" || row.state === "FAILED") {
+    return errorResponse(409, "JOB_ALREADY_TERMINAL", "A completed or failed Job cannot be cancelled.", correlation);
+  }
+  return jsonResponse(row.state === "CANCELLED" ? 200 : 202, parseJobRow(row));
 }
 
 export default {
