@@ -1,0 +1,36 @@
+#ifndef SYMBIOTYC_AMPHETAMIN_POLICY_H
+#define SYMBIOTYC_AMPHETAMIN_POLICY_H
+
+#include <stdint.h>
+
+typedef enum {
+    AMPHETAMIN_STANDBY = 0,
+    AMPHETAMIN_BOOST,
+    AMPHETAMIN_REFILL,
+    AMPHETAMIN_COOLDOWN,
+    AMPHETAMIN_BLOCKED
+} AmphetaminMode;
+
+typedef struct {
+    uint32_t backlog;
+    uint32_t ambiguous_tasks;
+    uint8_t resource_pressure; /* 0..100: token/API/CPU/memory pressure */
+    uint8_t overload_score;    /* 0..100: burn/overdose risk */
+    uint8_t quality_score;     /* 0..100: release quality */
+    uint32_t available_credits;
+    uint32_t max_credits;
+    uint32_t max_workers;
+    uint32_t random_u32;       /* supplied by a cryptographically secure host RNG */
+} AmphetaminInput;
+
+typedef struct {
+    AmphetaminMode mode;
+    uint32_t worker_count;
+    uint8_t request_refill;
+    uint8_t reason_code;
+} AmphetaminDecision;
+
+/* Pure policy evaluation; performs no I/O, provisioning, or secret handling. */
+AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *input);
+
+#endif
