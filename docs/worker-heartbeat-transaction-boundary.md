@@ -269,3 +269,28 @@ Keep the GROUP Access app default-deny. The next approved provisioning transacti
 This Access Service Token authenticates only the Provisioner-to-GROUP control-plane boundary. It is not a Worker Agent credential and must never be used as the Worker JWT signing key or heartbeat bearer credential. Worker JWT issuance, signing-key custody, issuer/audience validation, key rotation, and JTI/epoch revocation remain separate trust work.
 
 No Cloudflare resource, Access policy, Service Token, Worker binding, route, or application code was changed. AMPHETAMIN remains untouched. No enrollment or heartbeat route exists; no Worker is schedulable; Scheduler/dispatch remain disabled. I0 remains BLOCKED.
+
+## I0.13 — Provisioner Service Token preflight (2026-11-28)
+
+Read-only Cloudflare account preflight completed before any credential creation:
+
+- Account Service Token inventory: **0 tokens**.
+- Reusable Access policy inventory: **0 policies**.
+- GROUP Access app remains default-deny with no attached policies.
+- AMPHETAMIN Access app was not modified.
+
+The current Cloudflare OpenAPI schema confirms that account Service Tokens support an explicit duration string. `2160h` is exactly 90 days and is suitable for the proposed bounded Provisioner credential lifetime; `forever` is supported but explicitly not selected. The create response contains a sensitive `client_secret` field and the endpoint documentation states that this is the only time the secret is returned; if lost, it must be rotated or the token replaced.
+
+The reusable Access policy schema supports a specific-token selector `service_token: { token_id }`. This is preferred over `any_valid_service_token` because it scopes GROUP authorization to the single dedicated Provisioner token rather than every valid token in the account.
+
+**Credential handoff blocker:** the available connected tools in this session do not expose Symbiotyc RemoteView or an owner-approved secret-manager write interface. The read-only Browser connector cannot perform secure local form entry. Desktop Commander is not an approved substitute under the project security boundary. Therefore no Service Token was created, no Client Secret was generated or exposed, no Access Allow policy was added, and no Worker secret binding was written.
+
+### Required sequence to resume
+
+1. Establish an approved secure secret-capture destination and direct UI/input path (never ChatGPT chat, Git, D1, logs, or tool output).
+2. With explicit owner authorization, create one named account Service Token for the GROUP Provisioner with duration `2160h` and a clear owner/purpose tag.
+3. Capture the one-time Client Secret directly into the approved secret manager; keep the GROUP Access app default-deny until secure storage is confirmed.
+4. Create one reusable Access Allow policy scoped to the exact new `service_token.token_id` and attach it only to the GROUP app; verify policy and app read-back.
+5. Add the Provisioner credential to its dedicated runtime through a write-only secret binding, then run positive and negative auth probes. Do not reuse AMPHETAMIN identity or enable enrollment/heartbeat routes before the independent Worker JWT authority is ready.
+
+I0 remains BLOCKED. No Service Token, Access policy, Worker secret, Provisioner identity, enrollment route, or heartbeat route was created. Scheduler/dispatch remain disabled and no Worker is schedulable.
