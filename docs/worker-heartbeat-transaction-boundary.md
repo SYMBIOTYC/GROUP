@@ -515,3 +515,20 @@ Negative tests cover forged digest headers, changed method/path/body, query stri
 **Verification:** tests are committed; the exact resulting GitHub Actions runtime run has not yet been confirmed. No test pass is claimed here.
 
 **Boundary:** verifier and helper remain unwired to a route. No D1 write, credential, secret, Access policy, Cloudflare binding, deployment, or dispatch state changed. GROUP remains default-deny; AMPHETAMIN remains unchanged; enrollment/heartbeat and Scheduler/dispatch remain disabled.
+
+
+## I0.26.4 — read-only production D1 schema inventory (2026-11-28)
+
+A read-only Cloudflare inventory resolved the deployed GROUP Worker binding to production D1: Worker `symbiotyc-group-control-plane` → binding `DB` → `symbiotyc-group-compute-state` (production, jurisdiction `eu`).
+
+The production migration ledger contains only `0001_compute_core.sql`, `0002_runtime_ledger.sql`, and `0003_compute_approvals.sql`. Direct `sqlite_master` inspection confirms the existing compute/runtime/approval schema, but no `workers`, `worker_credentials`, `worker_enrollment_challenges`, or `worker_heartbeats` tables and no Worker heartbeat-fencing triggers. Migrations `0004_worker_registry.sql`, `0005_worker_heartbeat_fencing.sql`, and `0006_worker_provisioning_requests.sql` are not recorded as applied.
+
+**Conclusion:** production D1 has not reached the Worker Registry schema version. The I0.26.2/3 resolver's required tables do not exist in its actual target database; production credential lookup is not currently possible. This confirms schema drift between repository migrations and deployed D1 state.
+
+All SQL was read-only. Cloudflare reported `changed_db=false` and `rows_written=0`; no production D1 or Worker configuration was modified. No data rows were queried. No full CI or transaction behavior is claimed.
+
+**Gate:** I0.26.4 inventory complete; production schema readiness **BLOCKED** pending a separately reviewed migration rollout. Do not apply migrations as part of this audit. Do not expose enrollment/heartbeat, mark Workers eligible, or enable Scheduler/dispatch. I0.20 secure credential provisioning remains blocked independently.
+
+Canonical runtime contract: [I0.26.4 production D1 inventory](provisioner-runtime-contract.md#i0264--read-only-production-d1-schema-inventory-2026-11-28).
+
+Next: prepare a migration rollout review for 0004–0006, including preflight/rollback constraints and production D1 acceptance checks. No migration should be applied until that change is explicitly authorized.
