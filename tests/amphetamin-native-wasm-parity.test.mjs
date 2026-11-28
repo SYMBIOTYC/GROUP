@@ -86,3 +86,53 @@ test("native C and Worker WASM evaluators return identical decisions for policy 
     assert.deepEqual(wasmEvaluate(input), native, `native/WASM mismatch: ${name}`);
   }
 });
+
+
+function createDeterministicRandom(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return state >>> 0;
+  };
+}
+
+test("native C and Worker WASM remain equivalent across 4096 seeded property inputs", async () => {
+  const random = createDeterministicRandom(0x5a17c0de);
+  const module = await WebAssembly.compile(await readFile(wasmPath));
+  const wasmEvaluate = await createAmphetaminWasmEvaluator(module);
+  const u32Fields = [
+    "backlog", "ambiguous_tasks", "available_credits", "max_credits",
+    "max_workers", "random_u32", "activation_remaining_minutes", "new_deployments",
+    "deployment_extension_minutes", "max_activation_minutes", "deployment_streak",
+    "recovery_minutes"
+  ];
+  const u8Fields = [
+    "resource_pressure", "overload_score", "quality_score", "cooldown_latched",
+    "recovery_score", "integrity_risk", "burnout_score", "burnout_per_deploy",
+    "burnout_recovery_per_hour"
+  ];
+  const inputs = Array.from({ length: 4096 }, () => {
+    const input = {};
+    for (const field of u32Fields) input[field] = random();
+    for (const field of u8Fields) {
+      const maximum = ["cooldown_latched", "integrity_risk"].includes(field) ? 1 : 100;
+      input[field] = random() % (maximum + 1);
+    }
+    return input;
+  });
+
+  const nativeInput = Buffer.concat(inputs.map(encodeInput));
+  const nativeOutput = execFileSync(nativePath, { input: nativeInput, maxBuffer: 1024 * 1024 });
+  assert.equal(nativeOutput.length, inputs.length * 20, "native oracle must return one decision per input");
+
+  for (let index = 0; index < inputs.length; index++) {
+    const expected = decodeNativeDecision(nativeOutput.subarray(index * 20, (index + 1) * 20));
+    assert.deepEqual(
+      wasmEvaluate(inputs[index]),
+      expected,
+      `native/WASM mismatch at seed 0x5a17c0de, generated case ${index}`
+    );
+  }
+});
