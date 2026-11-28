@@ -24,6 +24,71 @@ const validIntent = () => ({
   output_policy: { format: "json", max_bytes: 1024 }
 });
 
+
+const activationServicePrincipal = {
+  kind: "service",
+  tenant_id: "tenant-test",
+  project_id: "project-test",
+  actor_id: "amphetamin-service",
+  scopes: ["compute:activation:read", "compute:activation:write"]
+};
+
+test("activation state API requires an authenticated service principal", async () => {
+  const response = await worker.fetch(new Request("https://group.test/v1/activation/state", {
+    headers: trustedHeaders({ ...basePrincipal, scopes: ["compute:activation:read"] })
+  }), {});
+  const result = await json(response);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error.code, "SERVICE_PRINCIPAL_REQUIRED");
+});
+
+test("activation state API enforces its dedicated read scope", async () => {
+  const principal = { ...activationServicePrincipal, scopes: ["compute:activation:write"] };
+  const response = await worker.fetch(new Request("https://group.test/v1/activation/state", {
+    headers: trustedHeaders(principal)
+  }), {});
+  const result = await json(response);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error.code, "FORBIDDEN");
+});
+
+test("activation event API rejects client-supplied timestamps and unknown fields", async () => {
+  const response = await worker.fetch(new Request("https://group.test/v1/activation/events", {
+    method: "POST",
+    headers: { ...trustedHeaders(activationServicePrincipal), "content-type": "application/json" },
+    body: JSON.stringify({
+      event_id: "deployment-0001",
+      event_type: "deployment",
+      occurred_at: "2000-01-01T00:00:00.000Z"
+    })
+  }), {});
+  const result = await json(response);
+  assert.equal(result.status, 422);
+  assert.equal(result.body.error.code, "INVALID_ACTIVATION_EVENT");
+});
+
+test("activation event API rejects externally submitted tick events", async () => {
+  const response = await worker.fetch(new Request("https://group.test/v1/activation/events", {
+    method: "POST",
+    headers: { ...trustedHeaders(activationServicePrincipal), "content-type": "application/json" },
+    body: JSON.stringify({ event_id: "tick-event-0001", event_type: "tick" })
+  }), {});
+  const result = await json(response);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error.code, "INTERNAL_TICK_ONLY");
+});
+
+test("activation event API requires a configured durable database", async () => {
+  const response = await worker.fetch(new Request("https://group.test/v1/activation/events", {
+    method: "POST",
+    headers: { ...trustedHeaders(activationServicePrincipal), "content-type": "application/json" },
+    body: JSON.stringify({ event_id: "deployment-0001", event_type: "deployment" })
+  }), {});
+  const result = await json(response);
+  assert.equal(result.status, 503);
+  assert.equal(result.body.error.code, "DATABASE_UNAVAILABLE");
+});
+
 test("health endpoint is read-only and explicitly reports dispatch disabled", async () => {
   const response = await worker.fetch(new Request("https://group.test/health"));
   const result = await json(response);
