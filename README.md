@@ -42,6 +42,7 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - [AMPHETAMIN MCP contract](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-MCP.md)
 - [Compute Control Plane](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Compute-Control-Plane.md)
 - [Worker Registry](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Worker-Registry.md)
+- [AMPHETAMIN quality-weighted randomized Worker scaling](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-Quality-Weighted-Random-Worker-Scaling.md)
 - [Execution Lifecycle](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Execution-Lifecycle.md)
 - [Live deployment verification (2026-11-28)](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md)
 
@@ -135,7 +136,9 @@ I0.26.8 production D1 read-only preflight: target DB is confirmed, but productio
 
 ## I0.26.9 — disposable local D1 migration acceptance
 
-CI now applies migrations 0001–0006 through Wrangler v4 against an isolated local D1 database and asserts six migration ledger rows, all nine critical Worker Registry security triggers, and zero FK violations. Run #298 passed (94/94 runtime tests, 22 migration tests, 8 resolver tests, local D1 acceptance); schema conformance run #305 passed. Production D1 remains unchanged and rollout HOLD pending independent backup/restore rehearsal and explicit authorization.
+Mainline CI run #298 validated the local D1 migration chain 0001–0006 (94/94 runtime tests, 22 Worker Registry migration tests, 8 resolver tests, local D1 acceptance); schema conformance run #305 passed. That evidence predates AMPHETAMIN migration 0007 and does not validate it.
+
+The AMPHETAMIN integration extends the isolated local-D1 acceptance gate to migrations 0001–0007. The updated script asserts seven migration-ledger rows, all nine Worker Registry plus three AMPHETAMIN triggers, both AMPHETAMIN activation tables, and zero foreign-key violations. This expanded gate is pending CI on the current AMPHETAMIN integration head; no pass is claimed yet. Production D1 remains unchanged and rollout HOLD pending independent backup/restore rehearsal and explicit authorization.
 
 ## I0.26.10 — production backup/restore readiness audit
 
@@ -145,3 +148,13 @@ Read-only checks confirm the production D1 Time Travel bookmark endpoint is avai
 ### I0.26.11 — production D1 backup/restore gate
 
 The I0.26.11 read-only audit confirms Time Travel support but no independently retrievable backup. Cloudflare reports R2 is not enabled for the account context. A full D1 export can block database requests; export, independent storage provisioning, and a remote disposable-D1 restore rehearsal are held for explicit owner approval. Production migrations 0004–0006 remain unapplied. See [worker heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i02611--external-backup-destination-and-restore-rehearsal-gate-2026-11-28) and [Provisioner runtime contract](docs/provisioner-runtime-contract.md#i02611--external-backup-destination-and-restore-rehearsal-gate-2026-11-28).
+
+
+## AMPHETAMIN policy runtime — mainline integration
+
+The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssembly ABI v1 evaluator are integrated against the current GROUP mainline. The WASM Worker entrypoint is `src/worker.mjs`; it delegates existing routes to `src/index.mjs` and lazily instantiates the policy module for `POST /v1/activation/evaluate`.
+
+- Activation-state migration: `migrations/0007_amphetamin_activation_state.sql`, after mainline migrations 0004–0006. Not applied to production.
+- Native C/WASM parity: 14 fixed vectors plus 5,000 seeded valid inputs.
+- Current mainline Worker Registry / Provisioner migration hardening and regression tests are retained unchanged.
+- Evaluation is policy-decision only. Dispatch, provisioning, and production rollout remain disabled.
