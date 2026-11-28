@@ -119,3 +119,8 @@ Migration `0004_worker_registry.sql` adds durable Worker identity, policy-grante
 ## 2.3 Database-enforced heartbeat fencing
 
 Migration `0005_worker_heartbeat_fencing.sql` adds a `BEFORE INSERT` guard requiring the Worker to be `ACTIVE` or `DEGRADED`, the supplied `registration_epoch` to match the current registration, the heartbeat sequence to equal the stored sequence plus one, and observed concurrency/CPU/memory not to exceed the registered capacity. An `AFTER INSERT` trigger advances the Worker heartbeat sequence, health state, server-received timestamp, lease expiry, record version, and update timestamp in the same database statement. A failed snapshot update aborts the insert. This protects the storage boundary against stale epochs, sequence gaps/replays, inactive Workers, and over-reported capacity. The caller must still wrap heartbeat insertion, audit and outbox writes in one D1 transaction; this migration does not provide an HTTP endpoint or authentication.
+
+
+## 2.4 F2.3 transactional heartbeat trust-authority gate
+
+The heartbeat service is blocked until an independent Provisioner identity and Worker credential verifier are deployed and verified. The existing AMPHETAMIN Service Binding assertion is valid only for the private Job API boundary and must not authorize Worker enrollment or heartbeat. See [F2.3 Transactional Heartbeat blocker](worker-heartbeat-transaction-boundary.md) for the source-backed finding, atomic D1 transaction contract, negative tests, and I0 release gate. No heartbeat route is exposed and dispatch remains disabled.
