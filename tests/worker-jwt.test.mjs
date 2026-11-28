@@ -155,3 +155,15 @@ test("rejects unsupported JOSE header parameters", async () => {
   const header = jsonPart({ alg: "ES256", typ: "JWT", kid: "group-2026-01", jku: "https://attacker.invalid/keys" });
   await assert.rejects(verifyWorkerJwt(`${header}.${parts[1]}.${parts[2]}`, f.options), /header|parameter/i);
 });
+
+test("rejects unrecognized identity or privilege claims", async () => {
+  const f = await fixture({ role: "admin", trust_class: "root" });
+  await assert.rejects(verifyWorkerJwt(f.token, f.options), /claim/i);
+});
+
+test("rejects unsafe key identifier syntax", async () => {
+  const f = await fixture();
+  const parts = f.token.split(".");
+  const header = jsonPart({ alg: "ES256", typ: "JWT", kid: "../attacker" });
+  await assert.rejects(verifyWorkerJwt(`${header}.${parts[1]}.${parts[2]}`, f.options), /kid|key/i);
+});
