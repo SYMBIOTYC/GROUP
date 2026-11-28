@@ -115,3 +115,6 @@ The deployed GROUP Worker `DB` binding was resolved read-only to production data
 ## I0.26.6 — quarantined enrollment request preparation
 
 Added a preparation-only GROUP module that composes ES256 Provisioner assertion verification with strict enrollment-contract validation. It consumes the same parsed body produced by request-binding verification and preserves the original request stream. It performs no D1 access and is not wired to a route. Runtime CI passed 94/94 tests (run #243, ID `46155487464`); schema/conformance CI passed (run #249, ID `46155487501`) on implementation/documentation commit `59340ff5d89e0770d389f09160b99fb4d9f25de6`. The first run caught a required-key iteration defect, corrected before the passing run. The I0.26.5 production D1 migration HOLD and B1–B3 blockers remain unchanged.
+
+
+Worker Registry migration corrections (I0.26.7): see [heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i0267--worker-registry-migration-security-corrections-2026-11-28) and [Provisioner runtime contract](docs/provisioner-runtime-contract.md#i0267--worker-registry-migration-security-corrections-2026-11-28). Production migration remains on HOLD.
