@@ -396,3 +396,8 @@ A read-only source/configuration audit was completed after I0.20:
 This design work can proceed without generating credentials. Actual Access token creation/secret storage remains blocked by I0.20 and must not be retried through another tool or route. Do not add routes or bindings to the live GROUP Worker as a workaround. Keep GROUP Access default-deny, AMPHETAMIN unchanged, and enrollment/heartbeat/Scheduler/dispatch disabled.
 
 Evidence: `src/index.mjs` (route table), `wrangler.jsonc` (only D1 DB binding), and the read-only deployed Worker inventory. No Cloudflare resources or application code were changed in this audit.
+
+
+## I0.22 — Provisioner runtime contract reference
+
+The dedicated Provisioner deployment, private GROUP Service Binding authorization, enrollment request/proof schemas, and Worker JWT profile are now specified in [docs/provisioner-runtime-contract.md](provisioner-runtime-contract.md). This does not enable a heartbeat route or satisfy I0.20 credential provisioning. The heartbeat trust gate remains closed until the independent authority and secure deployment prerequisites are verified.
