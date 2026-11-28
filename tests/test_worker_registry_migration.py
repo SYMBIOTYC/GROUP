@@ -316,7 +316,7 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         self.db.execute(
             """UPDATE worker_provisioning_requests
             SET worker_id='worker-a', state='COMPLETED', outcome_code='ENROLLED',
-                outcome_json='{"worker_id":"worker-a"}', completed_at='now', updated_at='now'
+                outcome_json='{"worker_id":"worker-a"}', completed_at='now', updated_at='later'
             WHERE provisioning_request_id='request-transition'"""
         )
         with self.assertRaises(sqlite3.IntegrityError):
