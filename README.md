@@ -145,3 +145,8 @@ Read-only checks confirm the production D1 Time Travel bookmark endpoint is avai
 ### I0.26.11 — production D1 backup/restore gate
 
 The I0.26.11 read-only audit confirms Time Travel support but no independently retrievable backup. Cloudflare reports R2 is not enabled for the account context. A full D1 export can block database requests; export, independent storage provisioning, and a remote disposable-D1 restore rehearsal are held for explicit owner approval. Production migrations 0004–0006 remain unapplied. See [worker heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i02611--external-backup-destination-and-restore-rehearsal-gate-2026-11-28) and [Provisioner runtime contract](docs/provisioner-runtime-contract.md#i02611--external-backup-destination-and-restore-rehearsal-gate-2026-11-28).
+
+
+### I0.26.12 — backup restore target provisioned; R2 activation blocked
+
+Owner approval received for production export, R2 independent storage, and a disposable remote D1 restore drill. The disposable EU D1 target `symbiotyc-group-compute-state-restore-drill-20261128` (UUID `0ade0a88-ccfe-454a-852b-f8d7efb023c9`) was created and verified empty. R2 list/create calls return 403 / 10042 requiring activation through the Cloudflare Dashboard; this runtime has no approved Dashboard UI/RemoteView path. No production export, R2 bucket/object, import, restore, or production migration was performed. Production remains HOLD. See [heartbeat backup gate](docs/worker-heartbeat-transaction-boundary.md#i02612--approved-restore-target-created-r2-activation-blocked-2026-11-28).
