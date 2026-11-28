@@ -53,14 +53,14 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         self.db.execute(
             """INSERT INTO worker_enrollment_challenges
             (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at)
-            VALUES ('challenge-1', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now')""",
+            VALUES ('challenge-1', 'worker-a', ?, 'provisioner:test', '2099-01-01T00:00:00Z', NULL, '2026-11-28T09:00:00Z')""",
             ("a" * 64,),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
                 """INSERT INTO worker_enrollment_challenges
                 (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at)
-                VALUES ('challenge-2', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now')""",
+                VALUES ('challenge-2', 'worker-a', ?, 'provisioner:test', '2099-01-01T00:00:00Z', NULL, '2026-11-28T09:00:00Z')""",
                 ("b" * 64,),
             )
 
@@ -78,14 +78,14 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         self.db.execute(
             """INSERT INTO worker_enrollment_challenges
             (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at)
-            VALUES ('challenge-a', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now')""",
+            VALUES ('challenge-a', 'worker-a', ?, 'provisioner:test', '2099-01-01T00:00:00Z', NULL, '2026-11-28T09:00:00Z')""",
             ("c" * 64,),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
                 """INSERT INTO worker_enrollment_challenges
                 (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at)
-                VALUES ('challenge-b', 'worker-b', ?, 'provisioner:test', 'later', NULL, 'now')""",
+                VALUES ('challenge-b', 'worker-b', ?, 'provisioner:test', '2099-01-01T00:00:00Z', NULL, '2026-11-28T09:00:00Z')""",
                 ("c" * 64,),
             )
 
