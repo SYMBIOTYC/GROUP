@@ -160,3 +160,18 @@ The I0.26.6 migration corrections are now verified in Wrangler's **local D1 runt
 The local D1 run validates the Wrangler/Miniflare local D1 execution path, not the live Cloudflare production database. No production D1 migrations were applied. No production routes, bindings, secrets, Scheduler or dispatch were changed. I0.20 credential provisioning remains an independent blocker; Worker enrollment/heartbeat endpoints and scheduling remain disabled. Production rollout still requires a separate review and explicit authorization.
 
 Implementation and executable checks are in [draft PR #19](https://github.com/SYMBIOTYC/GROUP/pull/19). Keep the PR draft; do not merge at this stage.
+
+
+## I0.26.8 — read-only production D1 rollout preflight (2026-11-28)
+
+**Decision: HOLD — production application is not approved.** This stage was read-only and made no Cloudflare resource or database changes.
+
+- Re-resolved the deployed `symbiotyc-group-control-plane` Worker settings. The live D1 binding is still `DB` and points to the production compute-state database; no preview database is configured.
+- Queried production `sqlite_master`, the `d1_migrations` ledger and `PRAGMA foreign_key_check`. The ledger still contains only `0001_compute_core.sql`, `0002_runtime_ledger.sql` and `0003_compute_approvals.sql`.
+- No `workers`, `worker_credentials`, `worker_enrollment_challenges`, `worker_heartbeats`, `worker_audit_events`, or Worker Registry triggers/indexes are present in the live schema. The existing `project_quotas` parent key is the expected composite primary key `(tenant_id, project_id)`.
+- `PRAGMA foreign_key_check` returned no violations.
+- D1 query metadata reported `changed_db=false` and `rows_written=0`; only schema and migration-ledger metadata were read.
+
+The local Wrangler/Miniflare verification from I0.26.7 is green, but it does not replace production D1 verification. Migrations `0004–0006` remain unapplied in production. The I0.20 secure credential-provisioning gate is still blocked; Worker enrollment/heartbeat routes and Scheduler/dispatch remain disabled. A separate explicit production-rollout authorization and final preflight are required before any migration is applied.
+
+Evidence and implementation: [I0.26.7 local D1 CI](https://github.com/SYMBIOTYC/GROUP/actions/runs/46156482128), [draft PR #19](https://github.com/SYMBIOTYC/GROUP/pull/19). PR remains draft; no merge.
