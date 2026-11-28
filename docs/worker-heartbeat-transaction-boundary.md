@@ -504,3 +504,14 @@ The test exposed a missing Worker-level revocation guard: `workers.revoked_at` m
 No live D1, route, binding, secret, Access policy, deployment, or Scheduler/dispatch setting changed. Resolver remains unconnected to the JWT verifier. Enrollment/heartbeat remains disabled.
 
 Next: run the committed migration-driven test against the full repository migration files in CI and perform read-only production D1 schema inventory; only then compose resolver and verifier behind a private non-routed boundary.
+
+
+## I0.24.3 — server-derived Provisioner request binding
+
+GROUP now has `src/provisioner-request-binding.mjs`. The Provisioner assertion verifier computes `rqh` and `ikh` from the actual inbound HTTP request; it no longer accepts caller-provided digest values. The helper pins the method/path to the internal enrollment endpoint, rejects query strings, validates the idempotency header and JSON content type, bounds the body to 64 KiB, canonicalizes the parsed JSON object, and hashes the request envelope and idempotency key separately. It reads from a cloned Request so a future handler retains the original body stream.
+
+Negative tests cover forged digest headers, changed method/path/body, query strings, malformed or missing idempotency keys, invalid JSON, array bodies, and incorrect content type. The signer/verifier interoperability test now supplies forged digest headers to prove they are ignored.
+
+**Verification:** tests are committed; the exact resulting GitHub Actions runtime run has not yet been confirmed. No test pass is claimed here.
+
+**Boundary:** verifier and helper remain unwired to a route. No D1 write, credential, secret, Access policy, Cloudflare binding, deployment, or dispatch state changed. GROUP remains default-deny; AMPHETAMIN remains unchanged; enrollment/heartbeat and Scheduler/dispatch remain disabled.
