@@ -401,3 +401,8 @@ Evidence: `src/index.mjs` (route table), `wrangler.jsonc` (only D1 DB binding), 
 ## I0.22 — Provisioner runtime contract reference
 
 The dedicated Provisioner deployment, private GROUP Service Binding authorization, enrollment request/proof schemas, and Worker JWT profile are now specified in [docs/provisioner-runtime-contract.md](provisioner-runtime-contract.md). This does not enable a heartbeat route or satisfy I0.20 credential provisioning. The heartbeat trust gate remains closed until the independent authority and secure deployment prerequisites are verified.
+
+
+## I0.23 persistence prerequisite
+
+The `worker_provisioning_requests` ledger is defined by migration `0006_worker_provisioning_requests.sql`. It binds each idempotency key hash to a Provisioner subject and request digest. This is storage only: it does not authenticate a Provisioner, issue a Worker credential, or expose a heartbeat route. Atomic enrollment must include the ledger, Worker, challenge, audit, and outbox in one D1 transaction.
