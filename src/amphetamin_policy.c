@@ -3,6 +3,9 @@
 #define QUALITY_FLOOR 70u
 #define REFILL_THRESHOLD_PERCENT 15u
 #define OVERLOAD_CUTOFF 90u
+#define RECOVERY_OVERLOAD_MAX 40u
+#define RECOVERY_PRESSURE_MAX 60u
+#define RECOVERY_SCORE_MIN 80u
 #define MAX_DEMAND_WORKERS 64u
 
 static AmphetaminDecision decision(AmphetaminMode mode, uint32_t workers,
@@ -26,13 +29,18 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
 
     if (in == 0 || in->quality_score > 100u ||
         in->resource_pressure > 100u || in->overload_score > 100u ||
+        in->recovery_score > 100u || in->cooldown_latched > 1u ||
         in->max_workers > MAX_DEMAND_WORKERS ||
         in->available_credits > in->max_credits) {
         return decision(AMPHETAMIN_BLOCKED, 0u, 0u, 1u);
     }
 
     /* Circuit breaker wins over demand and refill: do not dig the overload deeper. */
-    if (in->overload_score >= OVERLOAD_CUTOFF) {
+    if (in->overload_score >= OVERLOAD_CUTOFF ||
+        (in->cooldown_latched != 0u &&
+         !(in->recovery_score >= RECOVERY_SCORE_MIN &&
+           in->overload_score <= RECOVERY_OVERLOAD_MAX &&
+           in->resource_pressure <= RECOVERY_PRESSURE_MAX))) {
         return decision(AMPHETAMIN_COOLDOWN, 0u, 0u, 2u);
     }
 
@@ -40,9 +48,10 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
         return decision(AMPHETAMIN_BLOCKED, 0u, 0u, 3u);
     }
 
-    demand = in->backlog + in->ambiguous_tasks;
     if (in->backlog > UINT32_MAX - in->ambiguous_tasks) {
         demand = UINT32_MAX;
+    } else {
+        demand = in->backlog + in->ambiguous_tasks;
     }
 
     /* Situational activation: no clock or fixed schedule is involved. */
