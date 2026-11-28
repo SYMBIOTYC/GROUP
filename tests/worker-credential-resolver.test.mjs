@@ -18,7 +18,8 @@ const validRow = {
   token_jti: "credential-jti-001",
   signing_key_id: "group-2026-01",
   credential_expires_at: "2026-11-28T12:05:00.000Z",
-  revoked_at: null
+  revoked_at: null,
+  worker_revoked_at: null
 };
 
 function d1Returning(row) {
@@ -64,7 +65,7 @@ test("queries by server-issued worker subject and exact credential identity", as
   for (const fragment of [
     "JOIN workers", "w.worker_id = c.worker_id", "c.token_jti = ?",
     "c.registration_epoch = ?", "c.signing_key_id = ?", "c.revoked_at IS NULL",
-    "julianday(c.expires_at) > julianday(?)", "w.state IN ('ACTIVE', 'DEGRADED')",
+    "julianday(c.expires_at) > julianday(?)", "w.state IN ('ACTIVE', 'DEGRADED')", "w.revoked_at IS NULL",
     "w.tenant_id", "w.project_id"
   ]) assert.ok(fake.statement.includes(fragment), `missing SQL guard: ${fragment}`);
 });
@@ -85,7 +86,8 @@ test("rejects revoked, expired, or non-eligible Worker rows even if returned by 
   const invalidRows = [
     { ...validRow, revoked_at: "2026-11-28T11:59:00.000Z" },
     { ...validRow, credential_expires_at: "2026-11-28T12:00:00.000Z" },
-    { ...validRow, worker_state: "DRAINING" }
+    { ...validRow, worker_state: "DRAINING" },
+    { ...validRow, worker_revoked_at: "2026-11-28T11:59:00.000Z" }
   ];
   for (const row of invalidRows) {
     const resolve = createD1WorkerCredentialResolver({ db: d1Returning(row).db, now: () => now });
