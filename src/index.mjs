@@ -28,7 +28,8 @@ function correlationId(request) {
 function authorize(request, scope, correlation) {
   // This marker and principal are unsigned assertions, not credentials.
   // Trust them only when deployment topology guarantees Service-Binding-only ingress.
-  // The live workers.dev endpoint must remain blocked until that boundary is verified.
+  // 2026-11-28 account read-back: workers.dev/previews disabled, no GROUP domains/routes,
+  // and AMPHETAMIN is the sole Service Binding consumer. Revalidate before ingress changes.
   if (request.headers.get("x-symbiotyc-caller") !== "amphetamin") {
     return { response: errorResponse(401, "INTERNAL_GATEWAY_REQUIRED", "Requests must originate from the AMPHETAMIN service binding.", correlation) };
   }
