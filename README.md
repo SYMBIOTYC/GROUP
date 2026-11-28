@@ -42,6 +42,7 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - [AMPHETAMIN MCP contract](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-MCP.md)
 - [Compute Control Plane](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Compute-Control-Plane.md)
 - [Worker Registry](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Worker-Registry.md)
+- [AMPHETAMIN quality-weighted randomized Worker scaling](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-Quality-Weighted-Random-Worker-Scaling.md)
 - [Execution Lifecycle](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Execution-Lifecycle.md)
 - [Live deployment verification (2026-11-28)](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md)
 
@@ -132,3 +133,13 @@ The first Python CI attempt exposed a test-fixture timestamp issue in the PENDIN
 
 
 I0.26.8 production D1 read-only preflight: target DB is confirmed, but production ledger contains only migrations 0001–0003 and no Worker Registry schema. Migrations 0004–0006 remain unapplied; rollout HOLD. See [heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i0268--production-d1-read-only-preflight-2026-11-28).
+
+
+## AMPHETAMIN policy runtime — mainline integration
+
+The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssembly ABI v1 evaluator are integrated against the current GROUP mainline. The WASM Worker entrypoint is `src/worker.mjs`; it delegates existing routes to `src/index.mjs` and lazily instantiates the policy module for `POST /v1/activation/evaluate`.
+
+- Activation-state migration: `migrations/0007_amphetamin_activation_state.sql`, after mainline migrations 0004–0006. Not applied to production.
+- Native C/WASM parity: 14 fixed vectors plus 5,000 seeded valid inputs.
+- Current mainline Worker Registry / Provisioner migration hardening and regression tests are retained unchanged.
+- Evaluation is policy-decision only. Dispatch, provisioning, and production rollout remain disabled.
