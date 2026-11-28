@@ -491,3 +491,16 @@ Added `tests/provisioner-assertion.test.mjs` to the existing root Node test suit
 **Verification:** GitHub Actions run for the first test revision exposed one incorrect test expectation: changing only the idempotency key must change `ikh`, not `rqh`. The assertion was corrected and committed as `f1515ec2ea86e01a489e36e957373ac0dfbc63b3`. The workflow status for that corrected commit is pending at the time of this documentation update; do not treat the earlier failed run as a pass. The preceding run on the signer module without the root interoperability test passed, but it did not validate the full signer test file.
 
 **Security/deployment boundary:** this is a code-level signer only. No PKCS#8 key has been generated or provisioned; no Worker secret has been created or bound; the signer is not wired into `provisioner/src/index.mjs`; no GROUP route calls the verifier; and no Cloudflare resource, Access policy, Service Token, D1 migration, deployment, or dispatch state changed. I0.20's secure credential provisioning gate remains in force. Enrollment and heartbeat remain disabled.
+
+
+## I0.26.3 — resolver SQL verification against migration schema (2026-11-28)
+
+The exact resolver SQL is now exercised by `tests/test_worker_credential_resolver_sqlite.py` against a SQLite database initialized from migrations 0001, 0004 and 0005. Eight integration cases cover valid resolution, revoked/expired credentials, stale epoch, inactive Worker, mismatched JTI/key, and tenant/project provenance.
+
+The test exposed a missing Worker-level revocation guard: `workers.revoked_at` must be NULL independently of `workers.state`. The resolver now selects `worker_revoked_at`, adds `w.revoked_at IS NULL`, and rejects inconsistent rows with a populated revocation timestamp. The regression test failed before the fix and passed afterward.
+
+**Focused evidence:** SQLite integration harness 8/8 passed; Node resolver tests 8/8 passed on Node 22.16.0. Local SQLite run used the relevant DDL from the migrations; committed integration test reads the complete migration files. No Cloudflare D1 or production schema state is inferred. Full repository CI was not run.
+
+No live D1, route, binding, secret, Access policy, deployment, or Scheduler/dispatch setting changed. Resolver remains unconnected to the JWT verifier. Enrollment/heartbeat remains disabled.
+
+Next: run the committed migration-driven test against the full repository migration files in CI and perform read-only production D1 schema inventory; only then compose resolver and verifier behind a private non-routed boundary.
