@@ -42,6 +42,7 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - [AMPHETAMIN MCP contract](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-MCP.md)
 - [Compute Control Plane](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Compute-Control-Plane.md)
 - [Worker Registry](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Worker-Registry.md)
+- [AMPHETAMIN quality-weighted randomized Worker scaling](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-Quality-Weighted-Random-Worker-Scaling.md)
 - [Execution Lifecycle](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Execution-Lifecycle.md)
 - [Live deployment verification (2026-11-28)](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md)
 
@@ -111,3 +112,13 @@ The deployed GROUP Worker `DB` binding was resolved read-only to production data
 ## I0.26.5 — production D1 migration rollout review
 
 **HOLD — migrations 0004–0006 are not approved for production application.** Source review found three blockers: 0005 heartbeat triggers omit the independent Worker `revoked_at` guard; 0004's one-unconsumed-challenge index lets expired challenges block replacement; and 0006 lacks immutable idempotency-claim/state-transition guards. See [runtime contract](docs/provisioner-runtime-contract.md#i0265--production-d1-migration-rollout-review-2026-11-28), [F2.3 transaction gate](docs/worker-heartbeat-transaction-boundary.md#i0265--production-d1-migration-rollout-review-2026-11-28), and [identity contract](docs/worker-identity-and-enrollment-contract.md#i0265-migration-review-findings). No production D1 changes were made.
+
+
+## AMPHETAMIN policy runtime — integration branch
+
+The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssembly ABI v1 evaluator are being reconciled on a dedicated branch based on current `main`. The WASM Worker entrypoint is `src/worker.mjs`; it delegates existing GROUP routes to `src/index.mjs` and lazily instantiates the policy module only for `POST /v1/activation/evaluate`. Runtime CI compiles the WASM artifact before executing the test suite.
+
+- Durable activation-state migration: `migrations/0007_amphetamin_activation_state.sql` (renumbered after existing mainline migrations 0004–0006; not applied to production).
+- Native C/WASM parity includes 14 fixed vectors and 5,000 seeded valid inputs.
+- Evaluation remains a policy-decision endpoint only. Scheduler dispatch, Worker provisioning, and production rollout remain disabled.
+- This integration branch is not merge approval; full CI and code review are required before updating stacked PRs.
