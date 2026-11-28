@@ -60,6 +60,7 @@ BEFORE UPDATE ON worker_provisioning_requests
 WHEN OLD.state != 'PENDING'
   OR NEW.state != 'COMPLETED'
   OR NEW.provisioning_request_id IS NOT OLD.provisioning_request_id
+  OR (OLD.worker_id IS NOT NULL AND NEW.worker_id IS NOT OLD.worker_id)
   OR NEW.provisioner_subject IS NOT OLD.provisioner_subject
   OR NEW.idempotency_key_hash IS NOT OLD.idempotency_key_hash
   OR NEW.request_digest IS NOT OLD.request_digest
