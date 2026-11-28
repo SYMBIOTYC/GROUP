@@ -85,9 +85,12 @@ test("method, path, body, and idempotency key are cryptographically bound", asyn
   for (const [index, variant] of variants.entries()) {
     await t.test(`variant ${index + 1}`, async () => {
       const altered = await createProvisionerAssertion(f.signerEnv, variant, { nowSeconds: now });
-      assert.notEqual(altered.requestDigest, signed.requestDigest);
       if (variant.idempotencyKey !== input.idempotencyKey) {
+        assert.equal(altered.requestDigest, signed.requestDigest);
         assert.notEqual(altered.idempotencyKeyHash, signed.idempotencyKeyHash);
+      } else {
+        assert.notEqual(altered.requestDigest, signed.requestDigest);
+        assert.equal(altered.idempotencyKeyHash, signed.idempotencyKeyHash);
       }
     });
   }
