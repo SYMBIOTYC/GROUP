@@ -231,3 +231,22 @@ No Cloudflare resource or policy was changed. No Service Token, Allow policy, Wo
 From a normal external browser/network, request `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev/` without Cloudflare Access credentials and record the final URL, HTTP status, response headers, and whether the response is a Cloudflare Access denial page. Do not send cookies, credentials, or tokens. A 403/Access denial is the expected result for an unauthenticated request; a 404/1101/origin response must be investigated separately. If the request does not resolve or returns a TLS/DNS error, capture that exact browser error.
 
 Only after the unauthenticated denial is verified should the dedicated Provisioner Service Auth policy and secure token handoff be considered. Keep the policy default-deny until the dedicated credential exists; do not expose enrollment or heartbeat routes.
+
+## I0.12 — External Access enforcement probe via Cloudflare Browser Rendering (2026-11-28)
+
+The external probe was completed without requiring an end-user browser. Cloudflare Browser Rendering's read-only content endpoint fetched https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev/ from an independent browser session.
+
+Observed response chain:
+
+- Request to the GROUP hostname returned **HTTP 302**.
+- The Location redirected to the Cloudflare Access login path /cdn-cgi/access/login/symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev on the account's cloudflareaccess.com hostname.
+- The final document title was **Error · Cloudflare Access**; final response metadata reported HTTP **400** from the Access login endpoint.
+- The redirect response was served by Cloudflare (server: cloudflare) and included a Cloudflare Ray ID.
+
+This is positive end-to-end evidence that an unauthenticated request to the GROUP hostname is intercepted by Cloudflare Access and redirected to its login flow; the request did not reach the GROUP Worker. The final 400 is the Access login endpoint's response, not an origin response from GROUP. This verifies the intended unauthenticated boundary, but does not verify authenticated Provisioner access or any enrollment/heartbeat route.
+
+A separate read-only Access app inventory confirmed the AMPHETAMIN application remains SYMBIOTYC AMPHETAMIN MCP (eef48749-8655-44cf-b807-84b755fbfe22) with its existing owner-email Allow policy and 12h session; the GROUP app remains separate with policies: []. An unauthenticated fetch to the AMPHETAMIN hostname also redirected to its Cloudflare Access login flow. That confirms the Access boundary is still present, but does **not** prove authenticated AMPHETAMIN origin/runtime health. No AMPHETAMIN or GROUP Access configuration was changed during these probes.
+
+No Service Token, Allow policy, Worker secret, Provisioner identity, route, enrollment endpoint, or heartbeat endpoint was created. I0 remains blocked on independent Provisioner credential provisioning and Worker JWT trust authority; no Worker is schedulable and Scheduler/dispatch remain disabled.
+
+Next gate: provision the dedicated Provisioner identity and Service Token only after the owner approves the operation and a secure one-time secret capture path is ready. Keep the GROUP app default-deny until that credential is safely provisioned.
