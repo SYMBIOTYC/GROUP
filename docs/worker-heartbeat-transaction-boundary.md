@@ -250,3 +250,22 @@ A separate read-only Access app inventory confirmed the AMPHETAMIN application r
 No Service Token, Allow policy, Worker secret, Provisioner identity, route, enrollment endpoint, or heartbeat endpoint was created. I0 remains blocked on independent Provisioner credential provisioning and Worker JWT trust authority; no Worker is schedulable and Scheduler/dispatch remain disabled.
 
 Next gate: provision the dedicated Provisioner identity and Service Token only after the owner approves the operation and a secure one-time secret capture path is ready. Keep the GROUP app default-deny until that credential is safely provisioned.
+
+
+## I0.13 — Provisioner Service Auth policy contract audit (2026-11-28)
+
+A fresh read-only Cloudflare Primary account inventory and OpenAPI schema inspection established the exact next-step boundary:
+
+- The dedicated GROUP Access application `SYMBIOTYC GROUP Control Plane` remains attached to `symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`, type `self_hosted`, with `policies: []` and no allowed identity providers.
+- The account-level Access Service Token inventory is empty (`result: []`).
+- The dedicated GROUP application's policy-list endpoint is also empty (`result: []`).
+- The Access application policy schema supports an exact Service Token selector: `include: [{ "service_token": { "token_id": "<service-token-id>" } }]` with `decision: "allow"`. This permits a future narrowly scoped policy for one named Provisioner token. Do not use `any_valid_service_token`, which would admit unrelated account service tokens.
+- The account Service Token create schema requires `name`; supports a bounded `duration` (for example `2160h` = 90 days) and tags. The response exposes the Client Secret only once. No token was created and no secret value was requested or read.
+
+### Decision and execution guard
+
+Keep the GROUP Access app default-deny. The next approved provisioning transaction, once an owner explicitly authorizes it and a secure one-time secret capture path is ready, is: create a named, expiring dedicated Provisioner Service Token; capture its one-time Client Secret directly into the approved secure target; create a Service Auth Allow policy that references only that token's exact `token_id`; independently read back the policy and verify a wrong/missing token is denied. Do not send the secret through chat, Git, D1, CI output, or logs.
+
+This Access Service Token authenticates only the Provisioner-to-GROUP control-plane boundary. It is not a Worker Agent credential and must never be used as the Worker JWT signing key or heartbeat bearer credential. Worker JWT issuance, signing-key custody, issuer/audience validation, key rotation, and JTI/epoch revocation remain separate trust work.
+
+No Cloudflare resource, Access policy, Service Token, Worker binding, route, or application code was changed. AMPHETAMIN remains untouched. No enrollment or heartbeat route exists; no Worker is schedulable; Scheduler/dispatch remain disabled. I0 remains BLOCKED.
