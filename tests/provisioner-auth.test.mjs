@@ -92,22 +92,22 @@ test("rejects an AMPHETAMIN assertion even when its marker is present", async ()
   assert.equal(result.code, "PROVISIONER_ASSERTION_INVALID");
 });
 
-test("rejects wrong audience, expired assertion, request digest mismatch, and idempotency mismatch", async (t) => {
+test("rejects wrong audience, expiry, changed request body, and changed Idempotency-Key", async (t) => {
   const f = await fixture();
-  for (const [name, claims, digest, keyHash] of [
-    ["wrong audience", { aud: "symbiotyc.compute.worker-heartbeat.v1" }, requestDigest, idempotencyKeyHash],
-    ["expired", { exp: now }, requestDigest, idempotencyKeyHash],
-    ["different request", {}, "b".repeat(64), idempotencyKeyHash],
-    ["different idempotency key", {}, requestDigest, "d".repeat(64)]
+  for (const [name, claims, body, key] of [
+    ["wrong audience", { aud: "symbiotyc.compute.worker-heartbeat.v1" }, "{}", "enroll-worker-2026-0001"],
+    ["expired", { exp: now }, "{}", "enroll-worker-2026-0001"],
+    ["different request body", {}, '{"pool":"CLOUD-VPS"}', "enroll-worker-2026-0001"],
+    ["different idempotency key", {}, "{}", "enroll-worker-2026-0002"]
   ]) {
     await t.test(name, async () => {
       const jwt = await f.token(claims);
       const request = new Request("https://group.internal/internal/v1/worker-enrollments", {
         method: "POST",
-        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json", "idempotency-key": "enroll-worker-2026-0001" },
-        body: "{}"
+        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json", "idempotency-key": key },
+        body
       });
-      const result = await verifyProvisionerAssertion(request, f.env, { requestDigest: digest, idempotencyKeyHash: keyHash, nowSeconds: now });
+      const result = await verifyProvisionerAssertion(request, f.env, { nowSeconds: now });
       assert.equal(result.ok, false);
       assert.equal(result.code, "PROVISIONER_ASSERTION_INVALID");
     });
