@@ -37,18 +37,24 @@ test("computes binding from the actual Request and ignores caller-supplied diges
 
 test("binds the digest to method, exact pathname, and canonical parsed JSON body", async (t) => {
   const baseline = await computeProvisionerRequestBinding(request());
-  const variants = [
+  const invalidVariants = [
     ["method", request({ method: "PUT" })],
     ["path", request({ target: "https://group.internal/internal/v1/other" })],
-    ["body", request({ payload: JSON.stringify({ pool: "CLOUD-VPS" }) })],
     ["query", request({ target: url + "?override=1" })]
   ];
-  for (const [name, candidate] of variants) {
+  for (const [name, candidate] of invalidVariants) {
     await t.test(name, async () => {
       const result = await computeProvisionerRequestBinding(candidate);
       assert.equal(result.ok, false);
     });
   }
+  await t.test("body", async () => {
+    const changed = await computeProvisionerRequestBinding(request({
+      payload: JSON.stringify({ pool: "CLOUD-VPS" })
+    }));
+    assert.equal(changed.ok, true);
+    assert.notEqual(changed.requestDigest, baseline.requestDigest);
+  });
   const reordered = await computeProvisionerRequestBinding(request({
     payload: JSON.stringify({ capacity: { cpu_cores: 8, memory_mb: 16384 }, pool: "CLOUD-CPU" })
   }));
