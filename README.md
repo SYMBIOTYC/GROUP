@@ -63,6 +63,8 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - `migrations/0005_worker_heartbeat_fencing.sql` — database-enforced heartbeat epoch/sequence/state/capacity fencing and atomic Worker lease snapshot advancement.
 - `tests/test_worker_registry_migration.py` — SQLite migration invariants for tenant/project binding, challenge uniqueness, heartbeat sequence uniqueness and append-only audit.
 
+- [F2.3 Transactional Heartbeat blocker](docs/worker-heartbeat-transaction-boundary.md) — independent Provisioner/Worker credential authority prerequisite and atomic heartbeat contract.
+
 ## Deployment configuration
 
 - [GROUP deployment record](docs/deployment-record.md)
