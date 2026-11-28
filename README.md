@@ -56,6 +56,10 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - TaskResult is untrusted until schema, attempt, lease, output, and artifact integrity validation succeeds.
 - Audit and state transitions are durable and append-only; secrets and raw credentials never enter repository files or audit payloads.
 
+## Worker identity and enrollment
+
+- [Worker Identity and Enrollment Contract v1](docs/worker-identity-and-enrollment-contract.md) — provisioner/agent trust separation, one-time enrollment, short-lived Worker credentials, heartbeat fencing and release gates.
+
 ## Deployment configuration
 
 - [GROUP deployment record](docs/deployment-record.md)
