@@ -189,7 +189,7 @@ static void test_activation_window_and_burnout_are_capped_and_recoverable(void) 
     in.deployment_streak = 8;
     in.burnout_score = 80;
     in.burnout_per_deploy = 15;
-    in.recovery_minutes = 120;
+    in.recovery_minutes = 240;
     in.burnout_recovery_per_hour = 10;
     AmphetaminDecision out = amphetamin_evaluate(&in);
     assert(out.activation_remaining_minutes == 600);
