@@ -41,7 +41,7 @@ export async function computeProvisionerRequestBinding(request) {
 
     const url = new URL(request.url);
     if (url.pathname !== EXPECTED_PATH || url.search || url.hash ||
-        !url.pathname.startsWith("/internal/") || url.pathname.includes("\\\\")) {
+        !url.pathname.startsWith("/internal/") || url.pathname.includes("\\")) {
       return failure();
     }
 
