@@ -112,3 +112,8 @@ Machine-readable contracts:
 - `contracts/worker-enrollment-proof-v1.schema.json`
 
 These schemas reject caller-selected tenant/project/worker identity, trust class, capabilities, and extra fields. They do not imply that enrollment routes or credentials are deployed.
+
+
+## Provisioner idempotency persistence
+
+Migration `0006_worker_provisioning_requests.sql` adds a durable ledger keyed by Provisioner subject plus a SHA-256 hash of the idempotency key. The request digest binds the key to one canonical request; a changed payload under the same key must return 409. Raw idempotency keys are not persisted. The ledger is committed atomically with Worker, challenge, audit, and outbox state; SQLite checks do not substitute for D1 transaction/failure-injection evidence.
