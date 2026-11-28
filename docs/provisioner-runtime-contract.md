@@ -235,3 +235,23 @@ The helper reads `request.clone()`, so the original body stream remains availabl
 **Security/deployment boundary:** this is still a non-routed verification primitive. No enrollment route calls it; the helper does not mutate D1 or consume the request body seen by a future handler. No Service Token, secret, Access policy, binding, D1 migration, Worker deployment, or Scheduler/dispatch setting changed. I0.20 secure credential provisioning remains blocked; enrollment and heartbeat remain disabled.
 
 Next: verify the runtime CI result, then add an isolated private-boundary composition test proving that the GROUP handler can authenticate the Provisioner and safely pass the same parsed body to validation without enabling a public route.
+
+
+## I0.26.4 — read-only production D1 schema inventory (2026-11-28)
+
+A read-only Cloudflare inventory identified the exact production database bound to the deployed GROUP Worker: `symbiotyc-group-control-plane` → binding `DB` (type `d1`) → `symbiotyc-group-compute-state` (version `production`, jurisdiction `eu`). The SQL query was served by the production primary in region `EEUR` (colo `FRA`).
+
+The production `d1_migrations` ledger contains exactly:
+1. `0001_compute_core.sql` — applied 2026-11-28 01:53:18.
+2. `0002_runtime_ledger.sql` — applied 2026-11-28 01:53:18.
+3. `0003_compute_approvals.sql` — applied 2026-11-28 01:53:20.
+
+Direct `sqlite_master` inspection confirms the existing compute/runtime/approval tables and their indexes/triggers. It does **not** contain `workers`, `worker_credentials`, `worker_enrollment_challenges`, or `worker_heartbeats`, and no Worker Registry heartbeat-fencing triggers are present. Migrations `0004_worker_registry.sql`, `0005_worker_heartbeat_fencing.sql`, and `0006_worker_provisioning_requests.sql` are absent from the production migration ledger.
+
+**Impact:** the D1-backed credential resolver from I0.26.2/3 cannot resolve production Worker credentials because its required Worker Registry tables are absent. This is a confirmed production schema gap, not a resolver test failure. Do not use the production resolver as an acceptance test until the required migrations are separately reviewed and applied.
+
+**Read-only evidence:** all SQL was SELECT-only. Cloudflare query metadata reported `changed_db: false` and `rows_written: 0`; no migration, schema, data row, Worker binding, secret, route, deployment, or dispatch setting was changed. No production data rows were inspected.
+
+**Gate:** production D1 schema is not ready for Worker credential resolution or transactional heartbeat. Registration/heartbeat remain absent/disabled; no Worker is schedulable; Scheduler/dispatch remain disabled. I0.20 credential-provisioning block remains independent and unchanged.
+
+Canonical transaction gate: [F2.3 heartbeat transaction boundary](worker-heartbeat-transaction-boundary.md#i0264--read-only-production-d1-schema-inventory-2026-11-28).
