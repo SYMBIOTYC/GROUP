@@ -52,12 +52,14 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
     def test_enrollment_challenge_hash_is_unique_and_only_one_pending_per_worker(self):
         self.db.execute(
             """INSERT INTO worker_enrollment_challenges
-            VALUES ('challenge-1', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now')""",
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
+            VALUES ('challenge-1', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now', NULL)""",
             ("a" * 64,),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
                 """INSERT INTO worker_enrollment_challenges
+                (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
                 VALUES ('challenge-2', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now')""",
                 ("b" * 64,),
             )
@@ -75,12 +77,14 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         )
         self.db.execute(
             """INSERT INTO worker_enrollment_challenges
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
             VALUES ('challenge-a', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now')""",
             ("c" * 64,),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
                 """INSERT INTO worker_enrollment_challenges
+                (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
                 VALUES ('challenge-b', 'worker-b', ?, 'provisioner:test', 'later', NULL, 'now')""",
                 ("c" * 64,),
             )
@@ -212,6 +216,117 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
                     request_digest, worker_id, state, correlation_id, created_at, updated_at, completed_at, expires_at)
                    VALUES ('request-1', 'provisioner:a', ?, ?, 'missing-worker', 'COMPLETED', 'corr-1', 'now', 'now', 'now', 'later')""",
                 ("a" * 64, "b" * 64),
+            )
+
+
+    def test_heartbeat_rejects_revoked_worker_even_if_state_is_active(self):
+        self.db.execute(
+            "UPDATE workers SET state='ACTIVE', revoked_at='revoked' WHERE worker_id='worker-a'"
+        )
+        before = self.db.execute(
+            "SELECT heartbeat_sequence, state, lease_expires_at, record_version FROM workers WHERE worker_id='worker-a'"
+        ).fetchone()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_heartbeats VALUES
+                ('worker-a', 1, 1, 'healthy', 0, 0, 0, 'now', 'later')"""
+            )
+        after = self.db.execute(
+            "SELECT heartbeat_sequence, state, lease_expires_at, record_version FROM workers WHERE worker_id='worker-a'"
+        ).fetchone()
+        self.assertEqual(after, before)
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM worker_heartbeats").fetchone()[0], 0)
+
+    def test_expired_unconsumed_challenge_is_superseded_when_replacement_is_created(self):
+        self.db.execute(
+            """INSERT INTO worker_enrollment_challenges
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
+            VALUES ('challenge-expired', 'worker-a', ?, 'provisioner:test',
+                    '2026-11-28T10:00:00Z', NULL, '2026-11-28T09:00:00Z', NULL)""",
+            ("d" * 64,),
+        )
+        self.db.execute(
+            """INSERT INTO worker_enrollment_challenges
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
+            VALUES ('challenge-replacement', 'worker-a', ?, 'provisioner:test',
+                    '2026-11-28T12:00:00Z', NULL, '2026-11-28T11:00:00Z', NULL)""",
+            ("e" * 64,),
+        )
+        old = self.db.execute(
+            "SELECT consumed_at, superseded_at FROM worker_enrollment_challenges WHERE challenge_id='challenge-expired'"
+        ).fetchone()
+        self.assertEqual(old, (None, "2026-11-28T11:00:00Z"))
+        self.assertEqual(
+            self.db.execute("SELECT COUNT(*) FROM worker_enrollment_challenges WHERE worker_id='worker-a' AND consumed_at IS NULL AND superseded_at IS NULL").fetchone()[0],
+            1,
+        )
+
+    def test_unexpired_unconsumed_challenge_still_blocks_replacement(self):
+        self.db.execute(
+            """INSERT INTO worker_enrollment_challenges
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
+            VALUES ('challenge-live', 'worker-a', ?, 'provisioner:test',
+                    '2026-11-28T12:00:00Z', NULL, '2026-11-28T10:00:00Z', NULL)""",
+            ("f" * 64,),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_enrollment_challenges
+                (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
+                VALUES ('challenge-live-2', 'worker-a', ?, 'provisioner:test',
+                        '2026-11-28T13:00:00Z', NULL, '2026-11-28T11:00:00Z', NULL)""",
+                ("1" * 64,),
+            )
+
+    def test_provisioning_request_claims_are_immutable(self):
+        self.db.executescript((ROOT / "migrations" / "0006_worker_provisioning_requests.sql").read_text(encoding="utf-8"))
+        self.db.execute(
+            """INSERT INTO worker_provisioning_requests
+            (provisioning_request_id, provisioner_subject, idempotency_key_hash, request_digest,
+             state, correlation_id, created_at, updated_at, expires_at)
+            VALUES ('request-immutable', 'provisioner:a', ?, ?, 'PENDING', 'corr-a', 'now', 'now', 'later')""",
+            ("a" * 64, "b" * 64),
+        )
+        for sql in [
+            "UPDATE worker_provisioning_requests SET provisioner_subject='provisioner:b' WHERE provisioning_request_id='request-immutable'",
+            "UPDATE worker_provisioning_requests SET idempotency_key_hash=? WHERE provisioning_request_id='request-immutable'",
+            "UPDATE worker_provisioning_requests SET request_digest=? WHERE provisioning_request_id='request-immutable'",
+            "UPDATE worker_provisioning_requests SET correlation_id='corr-b' WHERE provisioning_request_id='request-immutable'",
+            "UPDATE worker_provisioning_requests SET expires_at='later-2' WHERE provisioning_request_id='request-immutable'"
+        ]:
+            with self.subTest(sql=sql), self.assertRaises(sqlite3.IntegrityError):
+                if "idempotency_key_hash=?" in sql or "request_digest=?" in sql:
+                    self.db.execute(sql, ("c" * 64,))
+                else:
+                    self.db.execute(sql)
+
+    def test_provisioning_request_only_allows_valid_pending_to_completed_transition(self):
+        self.db.executescript((ROOT / "migrations" / "0006_worker_provisioning_requests.sql").read_text(encoding="utf-8"))
+        self.db.execute(
+            """INSERT INTO worker_provisioning_requests
+            (provisioning_request_id, provisioner_subject, idempotency_key_hash, request_digest,
+             state, correlation_id, created_at, updated_at, expires_at)
+            VALUES ('request-transition', 'provisioner:a', ?, ?, 'PENDING', 'corr-a', 'now', 'now', 'later')""",
+            ("a" * 64, "b" * 64),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_provisioning_requests SET state='COMPLETED', completed_at='now' WHERE provisioning_request_id='request-transition'"
+            )
+        self.db.execute(
+            """UPDATE worker_provisioning_requests
+            SET worker_id='worker-a', state='COMPLETED', outcome_code='ENROLLED',
+                outcome_json='{"worker_id":"worker-a"}', completed_at='now', updated_at='now'
+            WHERE provisioning_request_id='request-transition'"""
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_provisioning_requests SET state='PENDING', completed_at=NULL, outcome_code=NULL, outcome_json=NULL WHERE provisioning_request_id='request-transition'"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_provisioning_requests SET request_digest=? WHERE provisioning_request_id='request-transition'",
+                ("c" * 64,),
             )
 
 
