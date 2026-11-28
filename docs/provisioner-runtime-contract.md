@@ -155,7 +155,7 @@ Added `src/worker-jwt.mjs` with an isolated `verifyWorkerJwt()` primitive and `t
 
 The primitive enforces:
 - Compact three-part JOSE format, bounded token size, canonical base64url and JSON object segments.
-- Exact JOSE header allowlist (`alg`, `typ`, `kid`) and strict claim allowlist; ES256 only; rejects `none`,  algorithm substitution, unsupported header parameters, unknown key IDs, non-P-256/non-public/non-verification keys, and malformed 64-byte ES256 signatures.
+- Exact JOSE header allowlist (`alg`, `typ`, `kid`) and strict claim allowlist; ES256 only; rejects `none`, algorithm substitution, unsupported header parameters, unknown key IDs, non-P-256/non-public/non-verification keys, and malformed 64-byte ES256 signatures.
 - Cryptographic signature verification before accepting claims.
 - Exact configured issuer and audience; required bounded subject/JTI; positive registration epoch; integer `iat`, `nbf`, `exp`; bounded clock skew; maximum 300-second lifetime and consistent time ordering.
 - Mandatory durable credential resolver. The resolved record must be active and match subject, JTI, registration epoch, and key ID exactly; revoked/inactive and stale-epoch records fail closed.
