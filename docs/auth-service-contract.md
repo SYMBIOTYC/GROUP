@@ -1,25 +1,32 @@
 # AMPHETAMIN-to-GROUP Internal Service Binding Contract
 
-**Status:** Private Service Binding trust contract. Repository configuration and the 2026-11-28 GET-only Cloudflare inventory agree that GROUP has no configured public Worker ingress in the inspected primary account. A live external edge probe was not performed; do not overstate this as a packet-level reachability test.
+**Status:** Intended internal Job API trust contract; current Cloudflare exposure differs from the target and is recorded below. No production AMPHETAMIN Worker or GROUP deployment behavior is inferred from this document alone.
 
-## Verified deployment posture — 2026-11-28
+## Current deployment security state (I0.8–I0.11)
 
-The primary Cloudflare profile read-back recorded:
+The GROUP Worker is currently enabled on the account's workers.dev subdomain:
 
-- GROUP Worker: `workers.dev` disabled; Preview URLs disabled.
-- GROUP Worker Domains: none returned; account Worker Domains total: zero.
-- Cloudflare Zones: zero returned for the account; external DNS providers and other Cloudflare accounts are outside this inventory.
-- Service Binding consumers: AMPHETAMIN is the only Worker found targeting `symbiotyc-group-control-plane`.
-- Access applications: one application returned, attached to AMPHETAMIN. No GROUP Access application was present in the returned inventory.
-- No live HTTP request or Access edge allow/deny probe was performed.
+`https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`
 
-The checked-in `wrangler.jsonc` independently sets `workers_dev=false` and `preview_urls=false`, with no `routes` or `custom_domains`. CI now guards these private-ingress invariants in `tests/security-boundary.test.mjs`.
+Its per-script Cloudflare subdomain settings were independently read back as `enabled=true`, `previews_enabled=false`. Thus the earlier target statement that `workers_dev=false` is NOT the current state.
 
-**Evidence boundary:** these are configuration and control-plane inventory facts, not a live network isolation test. Do not claim an external request was blocked by Cloudflare Access; GROUP is not protected by the AMPHETAMIN Access application. Any future ingress/configuration change requires a new read-back and security review.
+A dedicated Cloudflare Access self-hosted application protects this hostname:
+
+- Application: `SYMBIOTYC GROUP Control Plane`
+- Application ID: `2db93e50-e75b-4674-b55e-47631a2b7acf`
+- Type: `self_hosted`
+- Session duration: `1h`
+- Access policies: none (`policies=[]`); the intended posture is default-deny.
+- Service Tokens: none were present in the last inventory read (I0.13); no Provisioner token was created.
+- Preview URLs are disabled at the Worker subdomain setting.
+
+**Important evidence boundary:** the Access control-plane configuration is verified, but an unauthenticated external request has not yet produced a verified Access denial response. DNS/TLS/origin reachability and request-level Access enforcement remain unverified. Do not describe the hostname as externally proven blocked or the Worker as private-only until an external probe confirms it. The Access app's existence alone is not proof of enforcement.
 
 ## Intended trust model
 
-AMPHETAMIN is the standalone MCP ingress and authenticates its external caller. GROUP is the Compute Control Plane. The only intended GROUP application ingress is the Cloudflare Worker Service Binding configured on AMPHETAMIN:
+AMPHETAMIN is the standalone MCP ingress and authenticates its external caller. GROUP is the Compute Control Plane. There is no shared `API_TOKEN`, bearer secret, or credential transfer between AMPHETAMIN and GROUP.
+
+The intended Job API ingress is a Cloudflare Worker Service Binding configured on AMPHETAMIN:
 
 ```toml
 [[services]]
@@ -27,9 +34,7 @@ binding = "GROUP"
 service = "symbiotyc-group-control-plane"
 ```
 
-There is no shared `API_TOKEN`, bearer secret, or credential transfer between AMPHETAMIN and GROUP. The private Service Binding is the caller-authentication boundary.
-
-The headers below are an internal principal assertion, not a cryptographic credential. They MUST NOT be accepted as proof of caller identity over public HTTP. The `x-symbiotyc-caller` value is caller-controlled and the Base64URL principal is unsigned; their integrity depends on the request being delivered only through the private Service Binding. If public ingress is ever enabled, this contract is no longer sufficient and the change must be blocked pending a separately reviewed authentication design.
+The principal assertion below is trusted only on this private Service Binding boundary. It is not a cryptographic credential and MUST NOT be accepted merely because a request contains these headers over public HTTP. The current workers.dev hostname is an exposure deviation from the original private-only target; keep the Access application default-deny and verify enforcement before relying on it as an outer gate. Do not add public routes or expose Worker Registry endpoints.
 
 ## Request assertion
 
@@ -52,35 +57,16 @@ The decoded principal has this shape:
 
 AMPHETAMIN must derive every principal field from its authenticated session and server-side tenant/project membership. It must not copy `tenant_id`, `project_id`, `actor_id`, role, or scope values from caller-supplied tool arguments.
 
-GROUP validates the caller marker, bounded assertion size, principal shape, and endpoint scope. These checks validate the assertion's shape and requested authorization scope; they do not independently authenticate a public caller. The current trust decision is therefore conditional on the private ingress invariant above.
+GROUP validates the caller marker, bounded assertion size, principal shape, and endpoint scope. These checks are meaningful as an internal assertion only when the request is proven to have arrived through the Service Binding boundary. They do not independently authenticate a public caller.
 
 ## Security invariants
 
-- `workers_dev=false` and `preview_urls=false` remain mandatory.
-- GROUP `routes` and `custom_domains` remain absent/empty.
-- AMPHETAMIN remains the sole Service Binding consumer of GROUP.
+- The target production posture remains no public ingress: `workers_dev=false`, `preview_urls=false`, and no public route, deployment URL, or custom-domain route.
+- Current deviation: workers.dev is enabled; the dedicated Access app is configured default-deny but external enforcement remains unverified.
+- Only the AMPHETAMIN Worker should be configured with a Service Binding to GROUP.
 - The AMPHETAMIN MCP endpoint independently authenticates external clients and authorizes project membership.
-- Tenant, project, actor, and scopes are derived server-side; caller-supplied tool arguments cannot override them.
 - Worker identity and Worker control remain exclusively inside GROUP; AMPHETAMIN cannot register, configure, or directly contact Workers.
-- No static API token is shared, copied, returned, or written to GitHub/Wiki.
-- Service-binding and public-exposure configuration changes are security-sensitive and require review.
-- No Worker enrollment/heartbeat route is enabled by this contract; Worker Registry trust gates remain separate.
-
-## Verification and change gate
-
-1. Keep the GROUP Wrangler ingress guard tests passing in CI.
-2. After any deployment/configuration change, read back the per-Worker `workers.dev` and Preview URL flags, Worker Domains, routes/custom domains, and all Service Binding consumers.
-3. Confirm AMPHETAMIN remains the sole Service Binding consumer.
-4. Keep malformed principal, missing/wrong caller marker, and missing-scope requests fail-closed in GROUP tests.
-5. Do not infer live edge isolation from repository config or control-plane inventory alone. If a deployment introduces a hostname or route, require a separately authorized non-production edge verification before relying on the new boundary.
-6. Do not provision credentials, create Access policies, change routes, or deploy Workers as part of this repository-only contract update.
-
-External AMPHETAMIN authentication remains a separate prerequisite. Staging and production dispatch remain subject to their existing approval gates.
-
-## Historical pre-reverification deployment gate — superseded snapshot
-
-The following exact tail from the prior contract revision is retained only to preserve the historical merge-base record. Its statements about GROUP workers.dev and Access are superseded by the current verified posture at the beginning of this document.
-
+- No static API_TOKEN is shared, copied, returned, or written to GitHub/Wiki.
 - Service-binding and public-exposure configuration changes are reviewed as security-sensitive deployment changes.
 - No Worker enrollment/heartbeat route is enabled by this contract; the Worker Registry trust gates remain separate.
 
@@ -96,6 +82,7 @@ Before treating GROUP as private/internal in production:
 6. Prefer restoring `workers_dev=false` once the approved internal Service Binding path is validated and public hostname access is no longer required.
 
 Cloudflare Access is now configured for GROUP, contrary to the older statement in this document; enforcement at the external request layer is still unverified. External AMPHETAMIN authentication remains a separate prerequisite.
+
 
 ## I0.18 — Runtime Access probe (2026-11-28)
 
@@ -132,3 +119,32 @@ No code or Cloudflare resources changed. I0.20's credential provisioning safety 
 ## I0.22 — Provisioner runtime contract
 
 The isolated Provisioner runtime and enrollment boundary is now specified in [docs/provisioner-runtime-contract.md](provisioner-runtime-contract.md). Its Access Service Token authenticates only the Provisioner ingress; a dedicated private Service Binding authenticates Provisioner-to-GROUP; Worker Agents redeem a one-time challenge and receive a separate GROUP-signed ES256 JWT. The new request/proof schemas and schema-level tests are indexed in the repository README. No runtime route, secret, binding, or Access policy is enabled by this contract.
+
+## Superseding private-ingress contract — 2026-11-28
+
+This section supersedes the earlier deployment-state statements above wherever they differ. The latest Primary-account GET-only inventory records:
+
+- GROUP `workers.dev` disabled and Preview URLs disabled.
+- No GROUP Worker Domains or Cloudflare Zones returned in the inspected account.
+- AMPHETAMIN is the only observed Service Binding consumer targeting `symbiotyc-group-control-plane`.
+- The one Access application returned by the inventory is attached to AMPHETAMIN; no GROUP Access application was returned.
+- No live external HTTP edge request was performed in this verification. Do not claim packet-level isolation or an Access denial response.
+
+The checked-in GROUP `wrangler.jsonc` sets `workers_dev=false` and `preview_urls=false`, with no `routes` or `custom_domains`. `tests/security-boundary.test.mjs` guards these repository invariants.
+
+### Principal trust boundary
+
+AMPHETAMIN calls GROUP through the private `env.GROUP.fetch(request)` Service Binding. The `x-symbiotyc-caller` marker is caller-controlled, and `x-symbiotyc-principal` is an unsigned Base64URL envelope. Neither is cryptographic authentication. GROUP may trust the asserted principal only while the Service Binding is the exclusive ingress and AMPHETAMIN is the sole authorized consumer. These headers MUST NOT authenticate public HTTP requests.
+
+AMPHETAMIN remains responsible for authenticating the external caller and deriving tenant, project, actor, and scopes from trusted server-side context. GROUP validates assertion shape and endpoint scopes but does not treat those checks as proof of public caller identity.
+
+### Required invariants and verification
+
+1. Keep GROUP `workers_dev=false`, `preview_urls=false`, and `routes` / `custom_domains` absent or empty.
+2. Keep AMPHETAMIN as the only Service Binding consumer of GROUP; re-read all consumers after any configuration change.
+3. Fail closed on missing/wrong caller marker, malformed or oversized principal assertion, missing scope, and invalid tenant/project context.
+4. Treat any public ingress or additional Service Binding consumer as a security-boundary change requiring a separate authentication design and review.
+5. Distinguish control-plane configuration evidence from live network reachability; do not infer an edge deny result from Wrangler configuration or API inventory.
+6. Do not create credentials, Access policies, routes, D1 migrations, or deployments as part of this repository-only contract change.
+
+**Current gate:** private-ingress configuration and Service Binding consumer inventory are verified by read-only control-plane evidence; live runtime invocation and external edge response remain NOT_VERIFIED. Staging remains NO-GO.
