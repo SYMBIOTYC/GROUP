@@ -242,3 +242,217 @@ test("capabilities endpoint reports no enabled operations and keeps dispatch dis
   assert.deepEqual(result.body.enabled_operations, []);
   assert.equal(calls.length, 2);
 });
+
+
+const tenantBJob = {
+  job_id: "b5d6b8c6-79ec-4e45-86e7-5c9f0e36d0ad",
+  tenant_id: "tenant-b",
+  project_id: "project-b",
+  operation_id: "image.thumbnail",
+  state: "QUEUED",
+  record_version: 1,
+  created_at: "2026-11-28T00:00:00Z",
+  updated_at: "2026-11-28T00:00:00Z",
+  deadline_at: null,
+  correlation_id: "tenant-b-correlation"
+};
+
+const tenantAPrincipal = {
+  ...basePrincipal,
+  tenant_id: "tenant-a",
+  project_id: "project-a"
+};
+
+test("Tenant A cannot read Tenant B Job by its known UUID", async () => {
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...values) {
+          return {
+            first: async () => {
+              assert.match(sql, /WHERE job_id = \? AND tenant_id = \? AND project_id = \?/);
+              assert.deepEqual(values, [tenantBJob.job_id, "tenant-a", "project-a"]);
+              return values[1] === tenantBJob.tenant_id && values[2] === tenantBJob.project_id
+                ? tenantBJob
+                : null;
+            }
+          };
+        }
+      };
+    },
+    async batch() { return []; }
+  };
+
+  const response = await worker.fetch(new Request(`https://group.test/v1/jobs/${tenantBJob.job_id}`, {
+    headers: trustedHeaders(tenantAPrincipal)
+  }), { DB: db });
+  const result = await json(response);
+
+  assert.equal(result.status, 404);
+  assert.equal(result.body.error.code, "JOB_NOT_FOUND");
+  assert.equal(JSON.stringify(result.body).includes("tenant-b-correlation"), false);
+});
+
+test("Tenant A cannot cancel Tenant B Job or create audit/outbox side effects", async () => {
+  let batchStatements = [];
+  const db = {
+    prepare(sql) {
+      return {
+        sql,
+        bind(...values) {
+          return {
+            sql,
+            values,
+            first: async () => {
+              assert.match(sql, /WHERE job_id = \? AND tenant_id = \? AND project_id = \?/);
+              assert.deepEqual(values, [tenantBJob.job_id, "tenant-a", "project-a"]);
+              return null;
+            }
+          };
+        }
+      };
+    },
+    async batch(statements) {
+      batchStatements = statements;
+      const update = statements[0];
+      assert.match(update.sql, /WHERE job_id = \? AND tenant_id = \? AND project_id = \?/);
+      assert.equal(update.values[1], tenantBJob.job_id);
+      assert.deepEqual(update.values.slice(2), ["tenant-a", "project-a"]);
+      assert.match(statements[1].sql, /FROM jobs WHERE job_id = \? AND changes\(\) = 1/);
+      assert.match(statements[2].sql, /FROM jobs WHERE job_id = \? AND changes\(\) = 1/);
+      // The tenant-scoped UPDATE affects zero rows. SQLite's changes() guard
+      // therefore prevents the audit and outbox INSERT...SELECT statements.
+      return [{ meta: { changes: 0 } }, { meta: { changes: 0 } }, { meta: { changes: 0 } }];
+    }
+  };
+
+  const response = await worker.fetch(new Request(`https://group.test/v1/jobs/${tenantBJob.job_id}/cancel`, {
+    method: "POST",
+    headers: trustedHeaders(tenantAPrincipal)
+  }), { DB: db });
+  const result = await json(response);
+
+  assert.equal(result.status, 404);
+  assert.equal(result.body.error.code, "JOB_NOT_FOUND");
+  assert.equal(batchStatements.length, 3);
+});
+
+test("Tenant A cannot replay Tenant B idempotency record", async () => {
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...values) {
+          return {
+            first: async () => {
+              if (sql.includes("FROM idempotency_records")) {
+                assert.match(sql, /WHERE tenant_id = \? AND project_id = \? AND operation_id = \? AND idempotency_key_hash = \?/);
+                assert.deepEqual(values.slice(0, 2), ["tenant-a", "project-a"]);
+                // The synthetic Tenant B row must not match Tenant A's scoped lookup.
+                return values[0] === "tenant-b" && values[1] === "project-b"
+                  ? { request_hash: "a".repeat(64), job_id: tenantBJob.job_id }
+                  : null;
+              }
+              if (sql.includes("FROM project_operation_policies")) {
+                assert.deepEqual(values.slice(0, 2), ["tenant-a", "project-a"]);
+                return null;
+              }
+              if (sql.includes("FROM project_quotas")) {
+                assert.deepEqual(values, ["tenant-a", "project-a"]);
+                return null;
+              }
+              throw new Error("Unexpected query in cross-tenant idempotency test");
+            }
+          };
+        }
+      };
+    },
+    async batch() { return []; }
+  };
+
+  const response = await worker.fetch(new Request("https://group.test/v1/jobs", {
+    method: "POST",
+    headers: {
+      ...trustedHeaders(tenantAPrincipal),
+      "idempotency-key": "tenant-b-key-0001",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(validIntent())
+  }), { DB: db });
+  const result = await json(response);
+
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error.code, "OPERATION_NOT_ALLOWED");
+  assert.equal(JSON.stringify(result.body).includes(tenantBJob.job_id), false);
+});
+
+test("Tenant A activation evaluation hydrates only Tenant A project state", async () => {
+  const tenantBState = {
+    activation_remaining_minutes: 540,
+    deployment_streak: 5,
+    burnout_score: 90,
+    recovery_remainder_minutes: 0,
+    updated_at: "2026-11-28T10:00:00.000Z",
+    version: 17
+  };
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...values) {
+          return {
+            first: async () => {
+              assert.match(sql, /FROM amphetamin_activation_state WHERE tenant_id = \? AND project_id = \?/);
+              assert.deepEqual(values, ["tenant-a", "project-a"]);
+              // A Tenant B row exists, but cannot satisfy Tenant A's composite key.
+              return values[0] === "tenant-b" && values[1] === "project-b"
+                ? tenantBState
+                : null;
+            }
+          };
+        }
+      };
+    },
+    async batch() { return []; }
+  };
+  const evaluator = input => ({
+    mode: 0,
+    worker_count: 0,
+    activation_remaining_minutes: input.activation_remaining_minutes,
+    drive_multiplier_percent: 100,
+    projected_burnout_score: input.burnout_score
+  });
+  const telemetry = {
+    backlog: 0,
+    ambiguous_tasks: 0,
+    resource_pressure: 0,
+    overload_score: 0,
+    quality_score: 100,
+    cooldown_latched: 0,
+    recovery_score: 100,
+    integrity_risk: 0,
+    available_credits: 10,
+    max_credits: 10,
+    max_workers: 1
+  };
+
+  const response = await worker.fetch(new Request("https://group.test/v1/activation/evaluate", {
+    method: "POST",
+    headers: {
+      ...trustedHeaders({
+        ...activationServicePrincipal,
+        tenant_id: "tenant-a",
+        project_id: "project-a",
+        scopes: ["compute:activation:evaluate"]
+      }),
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(telemetry)
+  }), { DB: db, AMPHETAMIN_EVALUATOR: evaluator });
+  const result = await json(response);
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.activation_state.activation_remaining_minutes, 0);
+  assert.equal(result.body.activation_state.deployment_streak, 0);
+  assert.equal(result.body.activation_state.burnout_score, 0);
+  assert.equal(result.body.activation_state.version, 0);
+  assert.notEqual(result.body.activation_state.version, tenantBState.version);
+});
