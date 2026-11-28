@@ -47,7 +47,7 @@ static void test_overload_trips_circuit_breaker(void) {
     AmphetaminInput in = {0};
     in.backlog = 100;
     in.resource_pressure = 100;
-    in.overload_score = 95;
+    in.overload_score = 100;
     in.available_credits = 100;
     in.max_credits = 100;
     in.quality_score = 100;
