@@ -108,13 +108,13 @@ function parseJobRow(row) {
 
 
 async function activationStateRoute(request, env, principal, correlation, eventId = null) {
-  const dbError = databaseUnavailable(env, correlation);
-  if (dbError) return dbError;
   if (principal.kind !== "service") {
     return errorResponse(403, "SERVICE_PRINCIPAL_REQUIRED", "AMPHETAMIN activation state is writable/readable only by an authenticated service principal.", correlation);
   }
   try {
     if (eventId === null) {
+      const dbError = databaseUnavailable(env, correlation);
+      if (dbError) return dbError;
       const state = await getActivationState(env.DB, principal.tenant_id, principal.project_id);
       return jsonResponse(200, state);
     }
@@ -134,6 +134,8 @@ async function activationStateRoute(request, env, principal, correlation, eventI
         !["deployment", "tick"].includes(body.event_type)) {
       return errorResponse(422, "INVALID_ACTIVATION_EVENT", "event_id and event_type (deployment or tick) are required; timestamps are assigned by GROUP.", correlation);
     }
+    const dbError = databaseUnavailable(env, correlation);
+    if (dbError) return dbError;
     const state = await applyActivationEvent(
       env.DB, principal.tenant_id, principal.project_id, body.event_id, body.event_type
     );
