@@ -8,7 +8,7 @@ on:
       - "src/amphetamin_policy.c"
       - "src/amphetamin_policy.h"
       - "src/amphetamin_wasm.c"
-      - "tests/amphetamin-wasm-abi.test.mjs"
+      - "wasm-tests/amphetamin-wasm-abi.test.mjs"
       - ".github/workflows/amphetamin-wasm-abi.yml"
   workflow_dispatch:
 
@@ -42,7 +42,7 @@ jobs:
       - name: Verify wasm32 ABI round-trip in Node.js
         env:
           AMPHETAMIN_WASM_PATH: build/amphetamin_policy.wasm
-        run: node --test tests/amphetamin-wasm-abi.test.mjs
+        run: node --test wasm-tests/amphetamin-wasm-abi.test.mjs
       - name: Upload verified wasm32 policy artifact
         uses: actions/upload-artifact@v4
         with:
