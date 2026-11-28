@@ -198,3 +198,19 @@ Added `tests/provisioner-assertion.test.mjs` to the existing root Node test suit
 **Verification:** GitHub Actions run for the first test revision exposed one incorrect test expectation: changing only the idempotency key must change `ikh`, not `rqh`. The assertion was corrected and committed as `f1515ec2ea86e01a489e36e957373ac0dfbc63b3`. The workflow status for that corrected commit is pending at the time of this documentation update; do not treat the earlier failed run as a pass. The preceding run on the signer module without the root interoperability test passed, but it did not validate the full signer test file.
 
 **Security/deployment boundary:** this is a code-level signer only. No PKCS#8 key has been generated or provisioned; no Worker secret has been created or bound; the signer is not wired into `provisioner/src/index.mjs`; no GROUP route calls the verifier; and no Cloudflare resource, Access policy, Service Token, D1 migration, deployment, or dispatch state changed. I0.20's secure credential provisioning gate remains in force. Enrollment and heartbeat remain disabled.
+
+
+## I0.26.3 — resolver SQL verification against migration schema (2026-11-28)
+
+Added `tests/test_worker_credential_resolver_sqlite.py`. The test extracts the exact `LOOKUP_SQL` template from `src/worker-credential-resolver.mjs`, initializes SQLite using repository migrations `0001_compute_core.sql`, `0004_worker_registry.sql`, and `0005_worker_heartbeat_fencing.sql`, seeds a Worker and credential, and executes the resolver query. It covers valid resolution, credential revocation, credential expiry, stale Worker epoch, ineligible Worker state, JTI/key mismatch, and server-side tenant/project derivation.
+
+The integration test exposed an additional fail-closed edge case: the Worker row has its own `revoked_at` column. A corrupted/inconsistent row could otherwise have `state='ACTIVE'` while `revoked_at` was populated. The resolver now selects and rejects this field and adds `w.revoked_at IS NULL` to the SQL predicate. A regression test was first run RED (the resolver incorrectly returned the revoked Worker), then the fix was applied and the focused suite passed.
+
+**Verification evidence:**
+- `python -m unittest tests.test_worker_credential_resolver_sqlite -v`: 8 passed, 0 failed. Executed in an isolated local SQLite harness using the relevant DDL from migrations 0001/0004/0005. The committed test itself reads the complete repository migration files at runtime; this local run is not a Cloudflare D1 test and does not prove production schema application.
+- `node --test tests/worker-credential-resolver.test.mjs`: 8 passed, 0 failed on Node 22.16.0 in an isolated local working copy.
+- No full repository CI suite was run.
+
+**Security boundary:** no production D1 query, migration, Cloudflare binding, secret, Access policy, Worker deployment, route, or scheduler configuration was changed. The resolver remains isolated and is not wired into `verifyWorkerJwt()`. Enrollment/heartbeat and Scheduler/dispatch remain disabled.
+
+Next gate: run the committed SQLite integration test in the repository CI against the complete checked-in migration files, then perform a read-only schema inventory against the intended production D1 database. Do not enable routes until that evidence and the independent signing/key-rotation and transaction rollback gates exist.
