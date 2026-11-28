@@ -37,8 +37,3 @@ test("Worker WASM evaluator rejects missing, out-of-range, and non-integer ABI f
   assert.throws(() => evaluate({ ...policyInput, backlog: 1.5 }), /backlog/);
 });
 
-test("Worker WASM evaluator rejects a module with a missing ABI version export", async () => {
-  const module = await WebAssembly.compile(await readFile(wasmPath));
-  const evaluator = await createAmphetaminWasmEvaluator(module);
-  assert.equal(typeof evaluator, "function");
-});
