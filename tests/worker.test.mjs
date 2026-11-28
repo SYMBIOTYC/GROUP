@@ -356,6 +356,10 @@ test("Tenant A cannot replay Tenant B idempotency record", async () => {
                 assert.deepEqual(values.slice(0, 2), ["tenant-a", "project-a"]);
                 return null;
               }
+              if (sql.includes("FROM project_quotas")) {
+                assert.deepEqual(values, ["tenant-a", "project-a"]);
+                return null;
+              }
               throw new Error("Unexpected query in cross-tenant idempotency test");
             }
           };
@@ -406,7 +410,8 @@ test("Tenant A activation evaluation hydrates only Tenant A project state", asyn
           };
         }
       };
-    }
+    },
+    async batch() { return []; }
   };
   const evaluator = input => ({
     mode: 0,
