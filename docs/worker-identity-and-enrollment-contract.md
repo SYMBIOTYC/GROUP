@@ -175,3 +175,29 @@ Implementation and executable checks are in [draft PR #19](https://github.com/SY
 The local Wrangler/Miniflare verification from I0.26.7 is green, but it does not replace production D1 verification. Migrations `0004–0006` remain unapplied in production. The I0.20 secure credential-provisioning gate is still blocked; Worker enrollment/heartbeat routes and Scheduler/dispatch remain disabled. A separate explicit production-rollout authorization and final preflight are required before any migration is applied.
 
 Evidence and implementation: [I0.26.7 local D1 CI](https://github.com/SYMBIOTYC/GROUP/actions/runs/46156482128), [draft PR #19](https://github.com/SYMBIOTYC/GROUP/pull/19). PR remains draft; no merge.
+
+
+## I0.26.9 — production trust-provisioning readiness recheck (2026-11-28)
+
+**Decision: BLOCKED — do not provision or roll out.** This stage used read-only Cloudflare API calls only.
+
+Observed account state:
+- GROUP Access application `2db93e50-e75b-4674-b55e-47631a2b7acf` exists for `symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`.
+- GROUP Access application policy count: **0**. No allow policy is present.
+- Account Access Service Token count: **0**.
+- The account's `default_secrets_store` exists, but its secret count is **0**.
+- Cloudflare GET for Worker `symbiotyc-group-provisioner` settings returned HTTP 404 / error 10007: the Worker does not exist in the account. The repository scaffold is therefore not a deployed runtime.
+- No Service Token, Access policy, secret, Worker deployment, binding, route, or D1 resource was created or changed.
+
+**I0.20 blocker remains active:** the available session has no approved one-time secret capture and secure storage handoff. The presence of a Secrets Store API does not make it safe to submit a newly generated client secret through this session: write-only values cannot be read back, and no approved secure handoff to the operator was established. Do not create a Service Token or Secrets Store secret until an authorized capture path is available. Do not put credentials in chat, Git, D1, Worker logs, or ordinary tool output.
+
+### Required exit criteria
+1. Operator-approved secret capture path is available and tested without exposing the value in chat or logs.
+2. Create one narrowly scoped, time-bounded Service Token; securely capture the one-time client secret and retain only non-secret token metadata in the change record.
+3. Create the exact default-deny-compatible Access policy selecting only that token ID; read back policy and app state.
+4. Provision the Provisioner Worker only after its authenticated private Service Binding contract, runtime config, and fail-closed behavior are reviewed; no public enrollment endpoint.
+5. Bind only the minimum required secrets/configuration; verify bindings by metadata without reading or printing secret values.
+6. Verify authenticated private Provisioner→GROUP invocation and negative cases before enabling any enrollment path.
+7. Separately authorize and execute the production D1 migration rollout; this stage is not that authorization.
+
+Until all criteria pass, Worker enrollment/heartbeat routes remain absent or disabled, Worker scheduling remains ineligible, and Scheduler/dispatch remain disabled. Migrations `0004–0006` remain unapplied in production. PR #19 remains draft and unmerged.
