@@ -1,6 +1,8 @@
 name: GROUP D1 local migration compatibility
 
 on:
+  push:
+    branches: [i0-26-6-migration-defect-fixes]
   pull_request:
     paths:
       - "migrations/**"
