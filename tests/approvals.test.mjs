@@ -86,7 +86,7 @@ class MemoryApprovalDB {
       return { success:true, meta:{changes:1} };
     }
     if (sql.includes("INSERT INTO audit_events") && sql.includes("SELECT")) {
-      if (previousChanges===1) this.audit.push({values,action:values[1],resource_id:values[4]});
+      if (previousChanges===1) this.audit.push({values,action:sql.includes("COMPUTE_APPROVAL_CREATED") ? "COMPUTE_APPROVAL_CREATED" : "COMPUTE_APPROVAL_CONSUMED",resource_id:values[4]});
       return {success:true,meta:{changes:previousChanges===1?1:0}};
     }
     throw new Error("Unsupported fake D1 run() query: " + sql);
@@ -161,6 +161,10 @@ test("cannot consume approval with a different actor, tenant, project, operation
   const wrongPrincipal = { ...principal, actor_id:"access:other-actor" };
   const wrongActor = await consumeApproval(consumeRequest({ action:submit.action, operation_id:submit.operation_id, request_hash:submit.request_hash }), { DB }, wrongPrincipal, approvalId, "corr-1");
   assert.equal(wrongActor.status, 404);
+  const wrongTenant = await consumeApproval(consumeRequest({ action:submit.action, operation_id:submit.operation_id, request_hash:submit.request_hash }), { DB }, { ...principal, tenant_id:"other-tenant" }, approvalId, "corr-tenant");
+  assert.equal(wrongTenant.status, 404);
+  const wrongProject = await consumeApproval(consumeRequest({ action:submit.action, operation_id:submit.operation_id, request_hash:submit.request_hash }), { DB }, { ...principal, project_id:"other-project" }, approvalId, "corr-project");
+  assert.equal(wrongProject.status, 404);
   const wrongHash = await consumeApproval(consumeRequest({ action:submit.action, operation_id:submit.operation_id, request_hash:"d".repeat(64) }), { DB }, principal, approvalId, "corr-2");
   assert.equal(wrongHash.status, 409);
   assert.equal((await wrongHash.json()).error.code, "APPROVAL_MISMATCH");
