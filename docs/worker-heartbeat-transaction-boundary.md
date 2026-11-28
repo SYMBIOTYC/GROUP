@@ -568,3 +568,24 @@ Implementation is present on the I0.26.6 draft branch. GitHub Actions run for th
 - **B3 — Provisioner idempotency ledger:** migration 0006 requires new requests to enter as PENDING with no completion outcome. The only permitted update is one PENDING-to-COMPLETED transition; subject, idempotency-key hash, request digest, request ID, correlation ID, creation time and expiry are immutable. Completion requires a timestamp, non-empty outcome code and JSON outcome. Subsequent updates are rejected.
 
 Regression coverage for the three findings and fixture adjustments is in `tests/test_worker_registry_migration.py`. The test suite has **not yet been executed**: the available GitHub Actions query returned no workflow runs and the execution environment could not resolve github.com for a checkout. SQLite/D1 parity is therefore not claimed. Next gate: execute the complete migration tests in CI and a disposable D1-compatible database, review all results, then request separate authorization before any production rollout.
+
+
+## I0.26.7 — isolated D1-compatible migration verification (2026-11-28)
+
+The I0.26.6 migration corrections are now verified in Wrangler's **local D1 runtime** using a disposable local database configuration with synthetic database IDs and explicit `--local` commands. No remote D1 resource was created or accessed by this workflow.
+
+- **Migration sequence:** Wrangler applied migrations `0001` through `0006` sequentially to the isolated local D1 database.
+- **B1:** a revoked Worker whose state is inconsistently ACTIVE was rejected by the heartbeat trigger; the heartbeat row, sequence, lease, state and record version remained unchanged.
+- **B2:** an expired unconsumed challenge was superseded on replacement; the consumed marker remained untouched; an unexpired challenge continued to block a second replacement. A superseded challenge cannot be reopened or rebound, and a consumed challenge cannot be reopened or superseded.
+- **B3:** idempotency subject, key hash and request digest are immutable; a PENDING request completed once; the Worker binding could be assigned at completion but cannot subsequently be cleared or rebound; completed requests cannot be reopened.
+- **Schema integrity:** the local D1 test asserts exactly six migration ledger entries and no rows from `pragma_foreign_key_check`.
+- **Migration failure recovery:** a separate disposable local D1 database applies a baseline migration, then attempts a deliberately failing migration. CI asserts that the failed migration's partial table is rolled back while the prior migration and its data remain intact.
+
+**CI evidence**
+- [Wrangler local D1 migration compatibility — success](https://github.com/SYMBIOTYC/GROUP/actions/runs/46156482128)
+- [Python schema and migration tests — success](https://github.com/SYMBIOTYC/GROUP/actions/runs/46156482135)
+- [Node runtime unit tests — success](https://github.com/SYMBIOTYC/GROUP/actions/runs/46156482167)
+
+The local D1 run validates the Wrangler/Miniflare local D1 execution path, not the live Cloudflare production database. No production D1 migrations were applied. No production routes, bindings, secrets, Scheduler or dispatch were changed. I0.20 credential provisioning remains an independent blocker; Worker enrollment/heartbeat endpoints and scheduling remain disabled. Production rollout still requires a separate review and explicit authorization.
+
+Implementation and executable checks are in [draft PR #19](https://github.com/SYMBIOTYC/GROUP/pull/19). Keep the PR draft; do not merge at this stage.
