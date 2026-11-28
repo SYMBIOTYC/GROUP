@@ -74,7 +74,7 @@ test("rejects a forged caller marker without a signed bearer assertion", async (
     headers: { "x-symbiotyc-caller": "provisioner" },
     body: "{}"
   });
-  const result = await verifyProvisionerAssertion(request, f.env, { requestDigest, nowSeconds: now });
+  const result = await verifyProvisionerAssertion(request, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
   assert.equal(result.ok, false);
   assert.equal(result.code, "PROVISIONER_ASSERTION_REQUIRED");
 });
@@ -119,7 +119,7 @@ test("rejects algorithm substitution and invalid signatures", async () => {
   const requestA = new Request("https://group.internal/internal/v1/worker-enrollments", {
     method: "POST", headers: { authorization: `Bearer ${wrongAlgorithm}` }, body: "{}"
   });
-  const resultA = await verifyProvisionerAssertion(requestA, f.env, { requestDigest, nowSeconds: now });
+  const resultA = await verifyProvisionerAssertion(requestA, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
   assert.equal(resultA.ok, false);
 
   const otherPair = await webcrypto.subtle.generateKey(
@@ -129,6 +129,6 @@ test("rejects algorithm substitution and invalid signatures", async () => {
   const requestB = new Request("https://group.internal/internal/v1/worker-enrollments", {
     method: "POST", headers: { authorization: `Bearer ${wrongSignature}` }, body: "{}"
   });
-  const resultB = await verifyProvisionerAssertion(requestB, f.env, { requestDigest, nowSeconds: now });
+  const resultB = await verifyProvisionerAssertion(requestB, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
   assert.equal(resultB.ok, false);
 });
