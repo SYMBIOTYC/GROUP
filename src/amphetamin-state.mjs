@@ -18,7 +18,7 @@ function timestamp(value, name) {
   return Date.parse(value);
 }
 
-function validateState(state) {
+export function validateActivationState(state) {
   if (!state || typeof state !== "object") throw new TypeError("state must be an object");
   integer(state.activation_remaining_minutes, "state.activation_remaining_minutes", 0, 600);
   integer(state.deployment_streak, "state.deployment_streak", 0, 5);
@@ -37,7 +37,7 @@ function validatePolicy(policy) {
 }
 
 export function transitionActivationState(state, event, policy = POLICY) {
-  validateState(state);
+  validateActivationState(state);
   validatePolicy(policy);
   if (!event || !["deployment", "tick"].includes(event.type)) {
     throw new TypeError("event.type must be deployment or tick");
@@ -110,7 +110,7 @@ export async function getActivationState(db, tenantId, projectId, now = new Date
       version: 0
     };
   }
-  return mapRow(row);
+  return validateActivationState(mapRow(row));
 }
 
 /**
