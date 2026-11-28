@@ -95,4 +95,5 @@ PR #10 adds the private approval API and the D1 migration `0003_compute_approval
 - `migrations/0006_worker_provisioning_requests.sql` — durable Provisioner-subject-scoped idempotency ledger; schema only, not applied to production D1.
 - `provisioner/` — isolated, quarantined Provisioner Worker scaffold; deployment manifest declares a private GROUP Service Binding, but Access verification, GROUP authorization, and deployment are not implemented.
 - `tests/test_provisioner_runtime_layout.py` — static checks for Provisioner isolation and fail-closed defaults; execution not yet verified.
+- `src/worker-jwt.mjs` and `tests/worker-jwt.test.mjs` — isolated strict ES256 Worker JWT verifier and focused negative tests; run with `node --test tests/worker-jwt.test.mjs`. The verifier is not wired to D1 or an HTTP route.
 - `src/provisioner-auth.mjs` and `tests/provisioner-auth.test.mjs` — isolated ES256 Provisioner assertion verifier and focused negative tests; verifier is not wired to an enrollment route and trust keys are not configured.
