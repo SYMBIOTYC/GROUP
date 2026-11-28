@@ -365,3 +365,18 @@ A read-only audit of the Cloudflare Primary account and the current Cloudflare A
 No Service Token was created, no secret value was generated or stored, no Access policy or Identity Provider was added, and no Worker binding or application route changed during this operation. AMPHETAMIN remains untouched. GROUP remains default-deny; enrollment/heartbeat endpoints and Scheduler/dispatch remain disabled.
 
 **Next gate:** explicit owner authorization for creating the named 90-day Provisioner Service Token and storing its one-time secret in `default_secrets_store`; then independently verify the secret metadata and add only the exact-token Service Auth policy. Do not create an Identity Provider for machine-to-machine authentication unless a separate human-login requirement is approved.
+
+ 
+## I0.20 — Provisioner credential provisioning blocked by execution safety gate (2026-11-28)
+
+The owner explicitly authorized creation of one 90-day Provisioner Access Service Token and write-only persistence of its Client Secret in the existing Cloudflare Secrets Store. The attempted combined server-side operation was blocked by the execution safety layer before the Cloudflare write sequence ran.
+
+A subsequent independent read-only Cloudflare API read-back confirmed:
+- Account Service Token count: **0**.
+- Named token `SYMBIOTYC GROUP Provisioner 90d`: absent.
+- Secrets in `default_secrets_store`: **0**.
+- Named secret `SYMBIOTYC_GROUP_PROVISIONER_ACCESS_CLIENT_SECRET`: absent.
+
+Therefore no token was created, no Client Secret was generated or exposed, and no secret was stored. No Access policy, Worker binding, or application route changed. GROUP remains default-deny; AMPHETAMIN remains untouched; enrollment/heartbeat and Scheduler/dispatch remain disabled.
+
+This is an execution-policy block, not a Cloudflare API rejection. Do not retry the same credential-creation call through a different tool or route to evade the safety gate. The next step is to use an explicitly supported Cloudflare/ChatGPT secure credential-provisioning workflow or obtain an approved execution path; then repeat the owner-authorized operation with secret values kept out of tool output and logs.
