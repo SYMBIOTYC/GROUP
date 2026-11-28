@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.symbiotyc.dev/compute/v1/worker-enrollment-proof.schema.json",
+  "title": "Symbiotyc Worker Enrollment Proof v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "schema_version",
+    "challenge_id",
+    "challenge"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "symbiotyc.compute.v1"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "challenge_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "challenge": {
+      "type": "string",
+      "minLength": 43,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    }
+  }
+}
