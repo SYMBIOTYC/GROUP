@@ -197,6 +197,26 @@ static void test_activation_window_and_burnout_are_capped_and_recoverable(void) 
     assert(out.drive_multiplier_percent <= 150);
 }
 
+static void test_many_deployments_saturate_burnout_without_integer_wraparound(void) {
+    AmphetaminInput in = {0};
+    in.backlog = 40;
+    in.available_credits = 100;
+    in.max_credits = 100;
+    in.quality_score = 100;
+    in.max_workers = 16;
+    in.activation_remaining_minutes = 10;
+    in.new_deployments = UINT32_MAX;
+    in.deployment_extension_minutes = UINT32_MAX;
+    in.max_activation_minutes = 600;
+    in.deployment_streak = 4;
+    in.burnout_score = 100;
+    in.burnout_per_deploy = 100;
+    AmphetaminDecision out = amphetamin_evaluate(&in);
+    assert(out.activation_remaining_minutes == 600);
+    assert(out.projected_burnout_score == 100);
+    assert(out.drive_multiplier_percent == 150);
+}
+
 int main(void) {
     test_idle_does_not_consume_budget();
     test_backlog_activates_boost();
@@ -210,6 +230,7 @@ int main(void) {
     test_integrity_risk_forces_hard_stop();
     test_repeated_deployments_extend_activation_and_amplify_drive();
     test_activation_window_and_burnout_are_capped_and_recoverable();
-    puts("AMPHETAMIN C policy tests: 12 passed");
+    test_many_deployments_saturate_burnout_without_integer_wraparound();
+    puts("AMPHETAMIN C policy tests: 13 passed");
     return 0;
 }
