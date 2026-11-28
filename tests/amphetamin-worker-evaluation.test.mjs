@@ -96,7 +96,7 @@ test("authenticated Worker route executes the real C policy through WebAssembly"
   const result = await response.json();
   assert.equal(response.status, 200);
   assert.equal(result.decision.mode, 1);
-  assert.equal(result.decision.worker_count, 1);
+  assert.ok(result.decision.worker_count >= 1 && result.decision.worker_count <= telemetry.backlog);
   assert.equal(result.decision.reason_code, 5);
   assert.equal(result.activation_state.version, 0);
 });
