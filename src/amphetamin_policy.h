@@ -27,6 +27,15 @@ typedef struct {
     uint32_t max_credits;
     uint32_t max_workers;
     uint32_t random_u32;       /* supplied by a cryptographically secure host RNG */
+    uint32_t activation_remaining_minutes; /* state carried by GROUP controller */
+    uint32_t new_deployments;  /* deployment pulses since prior policy evaluation */
+    uint32_t deployment_extension_minutes;
+    uint32_t max_activation_minutes;
+    uint32_t deployment_streak; /* consecutive deployments in current activation chain */
+    uint8_t burnout_score;     /* 0..100 accumulated fatigue telemetry */
+    uint8_t burnout_per_deploy;
+    uint32_t recovery_minutes;
+    uint8_t burnout_recovery_per_hour;
 } AmphetaminInput;
 
 typedef struct {
@@ -35,6 +44,9 @@ typedef struct {
     uint8_t request_refill;
     uint8_t request_capacity;
     uint8_t reason_code;
+    uint32_t activation_remaining_minutes;
+    uint8_t drive_multiplier_percent;
+    uint8_t projected_burnout_score;
 } AmphetaminDecision;
 
 /* Pure policy evaluation; performs no I/O, provisioning, or secret handling. */
