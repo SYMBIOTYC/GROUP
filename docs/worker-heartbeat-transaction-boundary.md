@@ -532,3 +532,28 @@ All SQL was read-only. Cloudflare reported `changed_db=false` and `rows_written=
 Canonical runtime contract: [I0.26.4 production D1 inventory](provisioner-runtime-contract.md#i0264--read-only-production-d1-schema-inventory-2026-11-28).
 
 Next: prepare a migration rollout review for 0004–0006, including preflight/rollback constraints and production D1 acceptance checks. No migration should be applied until that change is explicitly authorized.
+
+
+## I0.26.5 — production D1 migration rollout review (2026-11-28)
+
+**Decision: HOLD — do not apply migrations 0004–0006 to production yet.** Review was source-only; no production D1, Worker binding, route, secret, deployment, or dispatch setting changed.
+
+The target is the I0.26.4-confirmed deployed GROUP `DB` binding. Required order: 0004 Worker Registry base tables → 0005 heartbeat fencing triggers → 0006 Provisioner request ledger. 0005 and 0006 both depend on tables created by 0004; all three are additive relative to the currently observed 0001–0003 baseline.
+
+### Blocking findings
+
+1. **0005 revocation guard mismatch:** the BEFORE INSERT and AFTER INSERT fencing predicates check Worker ID, epoch, next sequence and ACTIVE/DEGRADED state, but omit `workers.revoked_at IS NULL`. This conflicts with the independent revocation guard added to the I0.26.3 resolver. Fix both trigger predicates and add a regression proving a Worker with ACTIVE state plus non-NULL revoked_at cannot accept a heartbeat.
+2. **0004 expired challenge slot:** `worker_one_unconsumed_challenge` indexes `consumed_at IS NULL` without considering expiry. An expired but unconsumed challenge blocks a replacement. Specify explicit supersession/expiry handling and test it before rollout.
+3. **0006 mutable idempotency claims:** no trigger protects Provisioner subject, idempotency hash, or request digest from later updates; state transition constraints are also incomplete. Enforce immutable claims and PENDING → COMPLETED transition invariants, or document and prove an equivalent guarded transaction boundary.
+
+### Rollout controls
+
+Preflight must re-resolve the live Worker binding and database UUID, verify migration history is exactly 0001–0003, inspect name collisions and parent keys, inspect baseline FK/index/trigger definitions, run foreign-key checks where supported, and establish a verified backup/restore procedure and acceptable recovery point. Test corrected migrations against a disposable D1-compatible database and require CI evidence before production approval.
+
+If separately authorized, apply 0004 → 0005 → 0006 sequentially; stop on any error or ambiguous ledger state. Postflight verifies exact ledger order, expected tables/indexes/triggers and SQL, foreign-key integrity, the B1–B3 negative cases, and failure-injection atomicity in a disposable environment. Do not enable routes or dispatch as a side effect.
+
+No down migration or destructive rollback is approved. Prefer reviewed forward-fix for additive schema defects. Production restore is an incident action requiring independently verified backup/restore semantics and explicit authorization.
+
+I0.26.5 outcome: migration review completed, rollout **NOT APPROVED** pending B1–B3 remediation and verification. I0.20 credential provisioning remains independently blocked; registration/heartbeat and Scheduler/dispatch remain disabled.
+
+Canonical details: [GROUP runtime contract I0.26.5](provisioner-runtime-contract.md#i0265--production-d1-migration-rollout-review-2026-11-28).
