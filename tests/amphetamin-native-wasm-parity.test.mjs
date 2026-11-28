@@ -77,12 +77,80 @@ function decodeNativeDecision(buffer) {
   };
 }
 
+function createXorShift32(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return state >>> 0;
+  };
+}
+
+const boundaryValues = [0, 1, 2, 14, 15, 16, 69, 70, 71, 84, 85, 86, 99, 100, 0xfffffffe, 0xffffffff];
+
+function generateValidInput(next) {
+  const pick = (values) => values[next() % values.length];
+  const u32 = () => next();
+  const byte = () => pick(boundaryValues.slice(0, 14));
+  const maxCredits = u32();
+  const maxActivation = u32() || 1;
+  const deployments = pick([0, 0, 0, 1, 2, 4, 5, 100, 0xffffffff]);
+  return {
+    backlog: pick([0, 1, 2, 63, 64, 65, 0xfffffffe, 0xffffffff, u32()]),
+    ambiguous_tasks: pick([0, 1, 2, 63, 64, 0xfffffffe, 0xffffffff, u32()]),
+    resource_pressure: byte(),
+    overload_score: byte(),
+    quality_score: byte(),
+    cooldown_latched: next() & 1,
+    recovery_score: byte(),
+    integrity_risk: next() & 1,
+    available_credits: maxCredits === 0 ? 0 : next() % (maxCredits + 1),
+    max_credits: maxCredits,
+    max_workers: next() % 65,
+    random_u32: u32(),
+    activation_remaining_minutes: next() % (maxActivation + 1),
+    new_deployments: deployments,
+    deployment_extension_minutes: deployments === 0 ? u32() : (u32() || 1),
+    max_activation_minutes: maxActivation,
+    deployment_streak: pick([0, 1, 4, 5, 6, 0xffffffff, u32()]),
+    burnout_score: byte(),
+    burnout_per_deploy: byte(),
+    recovery_minutes: pick([0, 1, 59, 60, 61, 119, 120, 3600, u32()]),
+    burnout_recovery_per_hour: byte()
+  };
+}
+
+function runNativeBatch(inputs) {
+  const payload = Buffer.concat(inputs.map(encodeInput));
+  const result = spawnSync(nativePath, { input: payload, maxBuffer: 2 * 1024 * 1024 });
+  assert.equal(result.status, 0, `native batch evaluator failed: ${result.stderr?.toString()}`);
+  assert.equal(result.stdout.length, inputs.length * 20,
+    `native batch returned ${result.stdout.length} bytes for ${inputs.length} vectors`);
+  return inputs.map((_, index) => decodeNativeDecision(result.stdout.subarray(index * 20, (index + 1) * 20)));
+}
+
 test("native C and Worker WASM evaluators return identical decisions for policy vectors", async () => {
   const module = await WebAssembly.compile(await readFile(wasmPath));
   const wasmEvaluate = await createAmphetaminWasmEvaluator(module);
-  for (const [name, overrides] of vectors) {
-    const input = { ...base, ...overrides };
-    const native = decodeNativeDecision(execFileSync(nativePath, { input: encodeInput(input) }));
-    assert.deepEqual(wasmEvaluate(input), native, `native/WASM mismatch: ${name}`);
-  }
+  const inputs = vectors.map(([, overrides]) => ({ ...base, ...overrides }));
+  const nativeDecisions = runNativeBatch(inputs);
+  inputs.forEach((input, index) => {
+    assert.deepEqual(wasmEvaluate(input), nativeDecisions[index], `native/WASM mismatch: ${vectors[index][0]}`);
+  });
+});
+
+test("native C and Worker WASM evaluators remain identical across 5,000 seeded valid inputs", async () => {
+  const seed = 0x6a09e667;
+  const next = createXorShift32(seed);
+  const inputs = Array.from({ length: 5000 }, () => generateValidInput(next));
+  const nativeDecisions = runNativeBatch(inputs);
+  const module = await WebAssembly.compile(await readFile(wasmPath));
+  const wasmEvaluate = await createAmphetaminWasmEvaluator(module);
+
+  inputs.forEach((input, index) => {
+    const wasm = wasmEvaluate(input);
+    assert.deepEqual(wasm, nativeDecisions[index],
+      `native/WASM mismatch: seed=0x${seed.toString(16)}, index=${index}, input=${JSON.stringify(input)}, native=${JSON.stringify(nativeDecisions[index])}, wasm=${JSON.stringify(wasm)}`);
+  });
 });
