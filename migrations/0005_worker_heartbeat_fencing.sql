@@ -11,6 +11,7 @@ BEGIN
       AND w.registration_epoch = NEW.registration_epoch
       AND w.heartbeat_sequence + 1 = NEW.heartbeat_sequence
       AND w.state IN ('ACTIVE', 'DEGRADED')
+      AND w.revoked_at IS NULL
       AND NEW.observed_concurrency <= w.capacity_max_concurrency
       AND NEW.observed_cpu_millis <= w.capacity_cpu_millis
       AND NEW.observed_memory_bytes <= w.capacity_memory_bytes
@@ -33,7 +34,8 @@ BEGIN
   WHERE worker_id = NEW.worker_id
     AND registration_epoch = NEW.registration_epoch
     AND heartbeat_sequence + 1 = NEW.heartbeat_sequence
-    AND state IN ('ACTIVE', 'DEGRADED');
+    AND state IN ('ACTIVE', 'DEGRADED')
+    AND revoked_at IS NULL;
   SELECT CASE WHEN changes() != 1
     THEN RAISE(ABORT, 'heartbeat snapshot update lost fencing race') END;
 END;
