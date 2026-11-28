@@ -87,17 +87,18 @@ test("rejects an AMPHETAMIN assertion even when its marker is present", async ()
     headers: { authorization: `Bearer ${jwt}`, "x-symbiotyc-caller": "amphetamin" },
     body: "{}"
   });
-  const result = await verifyProvisionerAssertion(request, f.env, { requestDigest, nowSeconds: now });
+  const result = await verifyProvisionerAssertion(request, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
   assert.equal(result.ok, false);
   assert.equal(result.code, "PROVISIONER_ASSERTION_INVALID");
 });
 
-test("rejects wrong audience, expired assertion, and request digest mismatch", async (t) => {
+test("rejects wrong audience, expired assertion, request digest mismatch, and idempotency mismatch", async (t) => {
   const f = await fixture();
-  for (const [name, claims, digest] of [
-    ["wrong audience", { aud: "symbiotyc.compute.worker-heartbeat.v1" }, requestDigest],
-    ["expired", { exp: now }, requestDigest],
-    ["different request", {}, "b".repeat(64)]
+  for (const [name, claims, digest, keyHash] of [
+    ["wrong audience", { aud: "symbiotyc.compute.worker-heartbeat.v1" }, requestDigest, idempotencyKeyHash],
+    ["expired", { exp: now }, requestDigest, idempotencyKeyHash],
+    ["different request", {}, "b".repeat(64), idempotencyKeyHash],
+    ["different idempotency key", {}, requestDigest, "d".repeat(64)]
   ]) {
     await t.test(name, async () => {
       const jwt = await f.token(claims);
@@ -106,7 +107,7 @@ test("rejects wrong audience, expired assertion, and request digest mismatch", a
         headers: { authorization: `Bearer ${jwt}` },
         body: "{}"
       });
-      const result = await verifyProvisionerAssertion(request, f.env, { requestDigest: digest, idempotencyKeyHash, nowSeconds: now });
+      const result = await verifyProvisionerAssertion(request, f.env, { requestDigest: digest, idempotencyKeyHash: keyHash, nowSeconds: now });
       assert.equal(result.ok, false);
       assert.equal(result.code, "PROVISIONER_ASSERTION_INVALID");
     });
