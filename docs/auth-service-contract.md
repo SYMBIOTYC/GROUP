@@ -119,3 +119,21 @@ No code or Cloudflare resources changed. I0.20's credential provisioning safety 
 ## I0.22 — Provisioner runtime contract
 
 The isolated Provisioner runtime and enrollment boundary is now specified in [docs/provisioner-runtime-contract.md](provisioner-runtime-contract.md). Its Access Service Token authenticates only the Provisioner ingress; a dedicated private Service Binding authenticates Provisioner-to-GROUP; Worker Agents redeem a one-time challenge and receive a separate GROUP-signed ES256 JWT. The new request/proof schemas and schema-level tests are indexed in the repository README. No runtime route, secret, binding, or Access policy is enabled by this contract.
+
+## I0.24.1 — independent Provisioner-to-GROUP authorization (verifier foundation)
+
+GROUP now has a standalone verifier in `src/provisioner-auth.mjs`. It accepts only a compact Bearer JWT signed with ES256/P-256 by the dedicated Provisioner signing key and verifies it against a `kid`-indexed public-JWK set configured on GROUP. It does not inspect or trust `x-symbiotyc-caller`, `x-symbiotyc-principal`, or any caller-supplied identity marker. AMPHETAMIN remains a separate Job API principal and is rejected by the Provisioner subject check.
+
+The assertion profile is deliberately narrow:
+- exact JOSE header keys `alg=ES256`, `typ=JWT`, and bounded `kid`; algorithm substitution and extra header parameters are rejected;
+- exact claims `iss`, `aud`, `sub`, `iat`, `nbf`, `exp`, `jti`, `rqh`, and `ikh`; unknown claims are rejected;
+- issuer, audience, and subject must match the dedicated GROUP trust configuration;
+- `rqh` is the SHA-256 digest of the canonical request envelope (HTTP method, internal path, and canonical validated body); `ikh` is the SHA-256 hash of the Idempotency-Key;
+- JTI must be a UUID; assertion lifetime is at most 60 seconds with at most 5 seconds of clock skew;
+- only a public P-256 JWK is accepted by GROUP; private key material is rejected.
+
+The Provisioner assertion signing key is distinct from the Cloudflare Access Service Token and from GROUP's Worker JWT signing key. The private key belongs only to the isolated Provisioner runtime. GROUP receives only public JWK material, with overlapping `kid` entries used for controlled key rotation. The request ledger remains responsible for idempotent replay handling: same subject/key/digest resolves to the same request, while a different digest for the same key is a conflict.
+
+**Implementation boundary:** this commit adds the verifier module and focused Node tests only. The internal enrollment HTTP route does not yet call it; GROUP's runtime trust variables/public key set are not configured; the Provisioner signing key is not provisioned; the isolated Worker is not deployed and its Service Binding is not live. Do not infer authorization readiness from this helper alone. No Access policy, Service Token, secret, Cloudflare binding, route, D1 migration, Worker deployment, or Scheduler/dispatch state changed. Public GROUP Access remains default-deny and AMPHETAMIN is unchanged.
+
+**Verification:** the focused ES256 test cases cover valid assertion, forged caller marker, AMPHETAMIN subject, wrong audience, expiry, request-digest mismatch, idempotency-key mismatch, algorithm substitution, and invalid signature. The focused Node test was run locally on Node 22 and passed (5 top-level tests). This is not a full repository suite or Cloudflare Workers runtime verification.
