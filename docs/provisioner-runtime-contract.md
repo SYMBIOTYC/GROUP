@@ -458,3 +458,8 @@ The owner explicitly approved (a) production D1 export to independent storage, (
 **Not performed:** no production D1 export, signed URL download, R2 upload, import, or restore. The production database remains untouched. The disposable restore target is provisioned but empty.
 
 **Next gate:** R2 must be activated for the Primary Cloudflare account through an owner-approved Dashboard capability. After activation is independently verified, create a private EU/EEUR bucket with public managed domain disabled, verify bucket access, then perform the previously approved D1 export during a controlled maintenance window, transfer the SQL dump directly into that bucket without exposing the signed URL or SQL contents in chat, compute SHA-256, and run the import/restore drill only against the disposable D1 target. Do not proceed with production migrations 0004–0006 until this evidence and separate migration authorization exist.
+
+
+### I0.26.13 — Independent backup destination transfer gate (2026-11-28)
+
+Dropbox was approved as an alternative independent backup destination. Capability inspection found only conversation-file upload, not URL-based server-side binary ingestion/streaming. The D1 export's temporary signed URL and SQL dump must not pass through chat or an exposed attachment workflow. No production export, Dropbox write, or restore was attempted. The disposable restore D1 remains empty; production migrations 0004–0006 remain HOLD. Resume only when an approved server-to-server Cloudflare-export-to-Dropbox transfer path is available; then verify the stored object, compute SHA-256, and rehearse import/restore against the disposable D1.
