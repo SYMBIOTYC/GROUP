@@ -564,6 +564,6 @@ GROUP now has a preparation-only composition function that verifies the ES256 Pr
 
 The preparation function does not access D1 and is not wired into `src/index.mjs` or any HTTP route. It remains quarantined pending the dedicated Provisioner Service Binding trust configuration. A caller-controlled `x-symbiotyc-caller` marker does not grant Provisioner authority. This helper does not itself attest the network origin of the Service Binding invocation.
 
-Tests cover valid/invalid signed requests, schema boundaries, body preservation, forged caller marker, and no DB binding access. The first runtime run found a validator bug in required-key iteration; the implementation was corrected and a new CI run is pending.
+Tests cover valid/invalid signed requests, schema boundaries, body preservation, forged caller marker, and no DB binding access. GROUP runtime CI passed 94/94 tests (run #243, ID `46155487464`) on commit `59340ff5d89e0770d389f09160b99fb4d9f25de6`; schema/conformance CI also passed (run #249, ID `46155487501`). The initial required-key iteration defect was corrected before the passing run.
 
 I0.26.5 production D1 migration HOLD remains unchanged: B1–B3 must be remediated before migrations 0004–0006 can be considered for production application. No live resources or dispatch state changed.
