@@ -76,7 +76,7 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
     }
 
     if (in->max_workers == 0u || in->available_credits == 0u) {
-        return decision(AMPHETAMIN_REFILL, 0u, 1u, 4u);
+        return decision(AMPHETAMIN_REFILL, 0u, 1u, 0u, 4u);
     }
 
     /* Ambiguity and resource pressure increase demand, but stay quota-bounded. */
