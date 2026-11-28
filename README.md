@@ -42,6 +42,7 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - [AMPHETAMIN MCP contract](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-MCP.md)
 - [Compute Control Plane](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Compute-Control-Plane.md)
 - [Worker Registry](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Worker-Registry.md)
+- [AMPHETAMIN quality-weighted randomized Worker scaling](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-Quality-Weighted-Random-Worker-Scaling.md)
 - [Execution Lifecycle](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Execution-Lifecycle.md)
 - [Live deployment verification (2026-11-28)](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md)
 
@@ -115,3 +116,13 @@ The deployed GROUP Worker `DB` binding was resolved read-only to production data
 ## I0.26.6 — quarantined enrollment request preparation
 
 Added a preparation-only GROUP module that composes ES256 Provisioner assertion verification with strict enrollment-contract validation. It consumes the same parsed body produced by request-binding verification and preserves the original request stream. It performs no D1 access and is not wired to a route. Runtime CI passed 94/94 tests (run #243, ID `46155487464`); schema/conformance CI passed (run #249, ID `46155487501`) on implementation/documentation commit `59340ff5d89e0770d389f09160b99fb4d9f25de6`. The first run caught a required-key iteration defect, corrected before the passing run. The I0.26.5 production D1 migration HOLD and B1–B3 blockers remain unchanged.
+
+
+## AMPHETAMIN policy runtime — mainline integration
+
+The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssembly ABI v1 evaluator are integrated on a branch based on the current GROUP mainline. The WASM Worker entrypoint is `src/worker.mjs`; it delegates existing routes to `src/index.mjs` and lazily instantiates the policy module for `POST /v1/activation/evaluate`.
+
+- Activation-state migration: `migrations/0007_amphetamin_activation_state.sql`, after current mainline migrations 0004–0006. Not applied to production.
+- Native C/WASM parity: 14 fixed vectors plus 5,000 seeded valid inputs.
+- Evaluation is policy-decision only. Dispatch, provisioning, and production rollout remain disabled.
+- See [GROUP Draft PR #22](https://github.com/SYMBIOTYC/GROUP/pull/22); full integration CI is required before merge consideration.
