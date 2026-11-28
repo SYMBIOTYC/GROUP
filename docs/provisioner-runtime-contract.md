@@ -315,7 +315,7 @@ No down migrations are supplied or approved. Do not use destructive DROP-based r
 
 ## I0.26.6 — migration defect corrections (2026-11-28)
 
-Implementation is present on the I0.26.6 draft branch; validation remains pending. No production D1 migration was applied.
+Implementation is present on the I0.26.6 draft branch. GitHub Actions run for the code/test commit completed successfully: Python schema-conformance suite and Node runtime unit suite both report success. This confirms repository CI only; no disposable D1-compatible or production D1 execution is claimed. See [draft PR #19](https://github.com/SYMBIOTYC/GROUP/pull/19). No production D1 migration was applied.
 
 - **B1 — heartbeat revocation fencing:** both the BEFORE INSERT eligibility predicate and AFTER INSERT snapshot-update predicate in migration 0005 now require `workers.revoked_at IS NULL`. A revoked Worker cannot accept a heartbeat or advance its lease snapshot, including if its state is inconsistently ACTIVE/DEGRADED.
 - **B2 — enrollment challenge lifecycle:** migration 0004 adds `superseded_at`. The one-unconsumed-challenge unique index and expiry index now cover only rows with both `consumed_at IS NULL` and `superseded_at IS NULL`. A BEFORE INSERT trigger supersedes an existing challenge only when its `expires_at <= NEW.created_at`; the replacement operation must provide server-generated UTC `created_at`. A still-unexpired challenge continues to block a replacement. `consumed_at` retains its original meaning.
