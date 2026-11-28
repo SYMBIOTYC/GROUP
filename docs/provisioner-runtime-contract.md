@@ -322,6 +322,10 @@ The function performs no D1 access or mutation and is not imported by `src/index
 
 Tests cover valid and invalid signed requests, identity/trust field injection, invalid nested capacity/runtime, optional provider resource metadata, schema version rejection, forged AMPHETAMIN marker, preservation of the original body, and absence of DB binding access.
 
-**Verification status:** runtime CI for this stage initially exposed a validator implementation defect (`Set.prototype.every`); it was corrected by normalizing the required-key collection. The corrected commit's CI result is tracked separately below and must be green before this stage is marked verified.
+**Verification:** GitHub Actions on implementation/documentation commit `59340ff5d89e0770d389f09160b99fb4d9f25de6` passed:
+- GROUP runtime tests, run #243 / ID `46155487464`: 94 passed, 0 failed.
+- Compute protocol contracts/schema conformance, run #249 / ID `46155487501`: passed.
+
+The first run for the initial implementation exposed the required-key iteration defect; it was fixed before the successful 94/94 run.
 
 **Security boundary:** no route, D1 migration, D1 write, credential, secret, Access policy, binding, deployment, or dispatch state changed. I0.20 credential provisioning remains blocked. The production D1 migration HOLD from I0.26.5 remains in force; B1–B3 are still the next production-readiness blockers. Enrollment/heartbeat and Scheduler/dispatch remain disabled.
