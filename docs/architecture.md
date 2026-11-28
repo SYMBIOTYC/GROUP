@@ -27,6 +27,11 @@ GROUP is not a public API. It is deployed with `workers_dev=false`, `preview_url
 
 The principal assertion headers are not cryptographic credentials. They are trusted only because the GROUP Worker has no public ingress and only AMPHETAMIN is configured with the Service Binding. Never expose those headers over public HTTP. This removes the need for a shared static `API_TOKEN` between AMPHETAMIN and GROUP. See [the internal Service Binding contract](auth-service-contract.md).
 
+
+## 2.1 Worker identity and enrollment gate
+
+The normative v1 enrollment and credential contract is [Worker Identity and Enrollment Contract](worker-identity-and-enrollment-contract.md). AMPHETAMIN is not a Worker administrator or enrollment authority. Worker Registry endpoints remain unimplemented until a separate authenticated infrastructure provisioner and enrollment channel are deployed and verified. Do not add heartbeat routes that trust the AMPHETAMIN principal as Worker identity.
+
 ## 3. Trust boundaries
 
 1. AMPHETAMIN-to-GROUP: private Cloudflare Service Binding only; AMPHETAMIN authenticates the external caller and derives tenant/project/actor/scopes server-side. GROUP has no public route and accepts the bounded principal assertion only on that internal path.
