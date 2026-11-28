@@ -146,3 +146,24 @@ The Provisioner assertion signing key is distinct from the Cloudflare Access Ser
 **Implementation boundary:** this commit adds the verifier module and focused Node tests only. The internal enrollment HTTP route does not yet call it; GROUP's runtime trust variables/public key set are not configured; the Provisioner signing key is not provisioned; the isolated Worker is not deployed and its Service Binding is not live. Do not infer authorization readiness from this helper alone. No Access policy, Service Token, secret, Cloudflare binding, route, D1 migration, Worker deployment, or Scheduler/dispatch state changed. Public GROUP Access remains default-deny and AMPHETAMIN is unchanged.
 
 **Verification:** the focused ES256 test cases cover valid assertion, forged caller marker, AMPHETAMIN subject, wrong audience, expiry, request-digest mismatch, idempotency-key mismatch, algorithm substitution, and invalid signature. The focused Node test was run locally on Node 22 and passed (5 top-level tests). This is not a full repository suite or Cloudflare Workers runtime verification.
+
+
+
+## I0.26.1 — strict ES256 Worker JWT verifier core (2026-11-28)
+
+Added `src/worker-jwt.mjs` with an isolated `verifyWorkerJwt()` primitive and `tests/worker-jwt.test.mjs`. The verifier is deliberately not wired to any HTTP route or runtime binding.
+
+The primitive enforces:
+- Compact three-part JOSE format, bounded token size, canonical base64url and JSON object segments.
+- Exact JOSE header allowlist (`alg`, `typ`, `kid)); ES256 only; rejects `none), algorithm substitution, unsupported header parameters, unknown key IDs, non-P-256/non-public/non-verification keys, and malformed 64-byte ES256 signatures.
+- Cryptographic signature verification before accepting claims.
+- Exact configured issuer and audience; required bounded subject/JTI; positive registration epoch; integer `iat`, `nbf), `exp); bounded clock skew; maximum 300-second lifetime and consistent time ordering.
+- Mandatory durable credential resolver. The resolved record must be active and match subject, JTI, registration epoch, and key ID exactly; revoked/inactive and stale-epoch records fail closed.
+
+Focused test coverage includes a valid token and negative cases for algorithm substitution, malformed JOSE, unknown `kid), invalid signature, issuer/audience mismatch, not-before/expiry/lifetime/future-issued times, malformed identity claims, revoked JTI, stale epoch, mismatched credential records, missing trust configuration/resolver, unsupported JOSE header parameters, and inconsistent time ordering.
+
+**Verification:** the focused Node test file was executed in an isolated local working copy with Node 22.16.0: 13 tests passed, 0 failed. This is not a run of the full repository suite or deployed Cloudflare runtime. The test file is runnable with `node --test tests/worker-jwt.test.mjs` from the repository root. Existing Provisioner assertion verification remains a separate trust path and is not reused as a Worker credential verifier.
+
+**Security boundary:** no signing key, public-key configuration, GROUP D1 resolver, Worker route, Provisioner route, Access policy, Cloudflare binding, or deployed runtime was changed. The verifier is not yet wired to a production D1 credential lookup. The private ES256 signing key remains unprovisioned. Enrollment, heartbeat, Worker eligibility, Scheduler, and dispatch remain disabled.
+
+Next gate: implement the GROUP-side durable credential resolver against production-compatible D1 semantics and inject only a public-key set into the verifier; implement signing separately behind a GROUP-only write-only private-key binding, then add key-rotation overlap and transaction-boundary tests. Do not enable routes before these gates pass.
