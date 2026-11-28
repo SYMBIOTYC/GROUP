@@ -1,3 +1,5 @@
+import { computeProvisionerRequestBinding } from "./provisioner-request-binding.mjs";
+
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const SHA256_HEX = /^[a-f0-9]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -26,17 +28,15 @@ function exactKeys(value, allowed) {
 }
 
 export async function verifyProvisionerAssertion(request, env, {
-  requestDigest,
-  idempotencyKeyHash,
   nowSeconds = Math.floor(Date.now() / 1000)
 } = {}) {
-  if (!SHA256_HEX.test(requestDigest || "") || !SHA256_HEX.test(idempotencyKeyHash || "")) {
-    return failure("PROVISIONER_REQUEST_BINDING_REQUIRED");
-  }
-
   const authorization = request.headers.get("authorization") || "";
   const match = /^Bearer ([A-Za-z0-9_.-]{1,4096})$/.exec(authorization);
   if (!match) return failure("PROVISIONER_ASSERTION_REQUIRED");
+
+  const binding = await computeProvisionerRequestBinding(request);
+  if (!binding.ok) return failure("PROVISIONER_REQUEST_BINDING_INVALID");
+  const { requestDigest, idempotencyKeyHash } = binding;
 
   if (typeof env?.PROVISIONER_ISSUER !== "string" ||
       typeof env?.PROVISIONER_AUDIENCE !== "string" ||
