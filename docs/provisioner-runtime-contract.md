@@ -390,3 +390,53 @@ The production schema contains none of the Worker Registry / Provisioner tables 
 5. obtain explicit production migration authorization and a rollback/forward-recovery plan.
 
 This preflight confirms target identity and current migration state only; it does not authorize or execute a production migration.
+
+## I0.26.9 — disposable local D1 migration acceptance (2026-11-28)
+
+Added `tests/d1-migration-acceptance.sh` and wired it into `.github/workflows/runtime-ci.yml`. CI installs Wrangler v4 through `npx` and applies the complete migration chain 0001–0006 using explicit `--local` and an isolated `--persist-to .wrangler/d1-migration-acceptance` path. No `--remote` operation or Cloudflare production credential is used.
+
+The acceptance script then asserts:
+- local `d1_migrations` contains exactly six applied migrations;
+- all nine critical B1–B3 registry security triggers exist;
+- `pragma_foreign_key_check` reports zero violations.
+
+**Verification:** GitHub Actions on commit `6d0b3ff16f82aaa4b3d9a0faee6036537287cd96` passed:
+- Runtime suite: run #298 / ID `46156403517`, 94 passed, 0 failed.
+- Worker Registry migration tests: 22 passed.
+- Worker credential resolver tests: 8 passed.
+- Disposable local D1 migration acceptance: passed; all migrations 0001–0006 applied, `MIGRATION_LEDGER_OK`, `REGISTRY_SECURITY_TRIGGERS_OK`, and `FOREIGN_KEYS_OK`.
+- Compute protocol/schema conformance: run #305 / ID `46156403512`, passed.
+
+This is a real Wrangler local-D1 execution, stronger than the in-memory SQLite tests, but it is still not a remote disposable Cloudflare D1 database and not production. The production D1 preflight in I0.26.8 remains authoritative: production has only migrations 0001–0003. No remote D1 operation, production migration, export, restore, route, binding, secret, or dispatch change occurred.
+
+**Remaining production gates:** independent backup/export retrievability, restore rehearsal on a separate disposable database with measured RPO/RTO, final migration checksum archive tied to the approved release commit, and separate explicit production migration authorization. Production rollout remains **HOLD**.
+
+## I0.26.10 — production backup/restore readiness audit (2026-11-28)
+
+Read-only Cloudflare API checks reconfirmed the exact GROUP production D1 target: database `symbiotyc-group-compute-state`, UUID `633d7c14-d335-426c-be7e-2168a43171bc`, `version=production`, EU jurisdiction, 11 tables, 159,744 bytes, read replication disabled. The Time Travel bookmark endpoint returned a current bookmark; the bookmark value is deliberately not copied into repository documentation.
+
+Cloudflare's current D1 API exposes:
+- GET current Time Travel bookmark (read-only);
+- POST database export, which produces a downloadable SQL dump through a one-hour signed URL;
+- POST Time Travel restore, which overwrites the target database in place.
+
+The export endpoint documentation warns that an in-progress export may make the D1 database unavailable to serve queries and must be polled until completion. No export request was issued. No restore request was issued. No SQL dump, signed download URL, or production data rows were retrieved. The current bookmark proves Time Travel is available, not that an independent export has been captured or that restore has been rehearsed.
+
+Cloudflare's published Time Travel retention is plan-dependent (7 days on Workers Free, 30 days on Workers Paid); the account's applicable plan/retention was not independently established in this audit. A bookmark therefore must not be treated as a verified independent backup or as proof of an adequate recovery window.
+
+**Decision: HOLD.** The next action requiring owner approval is a full production D1 SQL export to an approved independent backup destination. This can affect database query availability during export and will contain production data. After that export is safely stored and integrity-checked, a separate disposable D1 database and restore/import rehearsal can establish measured RPO/RTO. No production mutation or data export was performed in I0.26.10.
+
+
+## I0.26.11 — external backup destination and restore rehearsal gate (2026-11-28)
+
+A read-only review of Cloudflare's current D1 documentation and account API establishes the following:
+
+- The live database uses `version=production`, so D1 Time Travel applies. It is always enabled and provides point-in-time restore, but restore overwrites the same database in place; it is not an independently retrievable export. Published retention is plan-dependent: 7 days for Workers Free and 30 days for Workers Paid. The applicable account plan was not verified.
+- Cloudflare's D1 export API produces a SQL dump through a temporary signed download URL. Cloudflare documents that a running export blocks other database requests. An export therefore needs an approved maintenance window and a separately controlled destination, plus integrity verification before it can count as an independent backup.
+- Cloudflare's documented long-retention pattern exports D1 through a Workflow and stores the dump in R2. The account's R2 bucket-list API returned HTTP 403 / error 10042, `Please enable R2 through the Cloudflare Dashboard.` This is evidence that R2 is not enabled for this account context; it is not evidence of an existing backup bucket. No bucket was created or enabled.
+- No D1 export, signed-URL download, import, restore, R2 write, or production data retrieval was performed. No new D1 database or other Cloudflare resource was created.
+
+**Recovery design:** retain D1 Time Travel as the fast in-place recovery mechanism, but do not count it as the independent backup. For independent recovery, first approve and provision a destination outside the target D1 (R2 after explicit enablement/approval, or another owner-approved secure storage destination). Export SQL in a controlled window; record the export bookmark, file size, SHA-256, schema/table inventory, and storage object/version metadata without putting production rows or signed URLs in Git. Then restore/import only into a separately approved disposable D1 database, compare schema and deterministic row-count/checksum invariants, run migration/trigger checks, and record measured RPO/RTO. Preserve the original export as immutable evidence.
+
+**Decision: HOLD.** This stage is blocked on owner approval for (1) exporting production data and accepting the documented temporary query unavailability, (2) enabling/choosing an independent backup destination, and (3) creating a disposable remote D1 database for the restore/import rehearsal. No production migration 0004–0006 is authorized. Enrollment, heartbeat, Scheduler, and dispatch remain disabled. After backup/restore evidence is complete, compute and archive SHA-256 checksums for the exact migration artifacts and obtain separate explicit production migration authorization.
+
