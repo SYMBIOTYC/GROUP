@@ -12,12 +12,16 @@ _Static_assert(offsetof(AmphetaminDecision, activation_remaining_minutes) == 12u
 int main(void) {
     AmphetaminInput input;
     AmphetaminDecision output;
-    if (fread(&input, sizeof(input), 1u, stdin) != 1u) {
-        return 2;
+
+    for (;;) {
+        size_t count = fread(&input, sizeof(input), 1u, stdin);
+        if (count == 0u) {
+            if (feof(stdin)) return 0;
+            return 2;
+        }
+        output = amphetamin_evaluate(&input);
+        if (fwrite(&output, sizeof(output), 1u, stdout) != 1u) {
+            return 3;
+        }
     }
-    output = amphetamin_evaluate(&input);
-    if (fwrite(&output, sizeof(output), 1u, stdout) != 1u) {
-        return 3;
-    }
-    return 0;
 }
