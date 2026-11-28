@@ -567,3 +567,16 @@ The preparation function does not access D1 and is not wired into `src/index.mjs
 Tests cover valid/invalid signed requests, schema boundaries, body preservation, forged caller marker, and no DB binding access. GROUP runtime CI passed 94/94 tests (run #243, ID `46155487464`) on commit `59340ff5d89e0770d389f09160b99fb4d9f25de6`; schema/conformance CI also passed (run #249, ID `46155487501`). The initial required-key iteration defect was corrected before the passing run.
 
 I0.26.5 production D1 migration HOLD remains unchanged: B1–B3 must be remediated before migrations 0004–0006 can be considered for production application. No live resources or dispatch state changed.
+
+
+## I0.26.7 — Worker Registry migration security corrections (2026-11-28)
+
+Corrected the three source-level blockers identified in I0.26.5:
+
+- **B1 heartbeat revocation fencing:** migration 0005 now requires `workers.revoked_at IS NULL` in both the BEFORE INSERT admission predicate and AFTER INSERT snapshot update. A Worker with inconsistent `state='ACTIVE'` and a populated revocation timestamp cannot accept a heartbeat.
+- **B2 challenge expiry lifecycle:** migration 0004 adds nullable `superseded_at`. The one-unconsumed-challenge unique index now applies only where both `consumed_at` and `superseded_at` are NULL. Before a replacement challenge is inserted, a trigger supersedes only an unconsumed, unsuperseded challenge whose `expires_at <= NEW.created_at`. A still-valid challenge continues to block replacement; expiry is not misrepresented as consumption.
+- **B3 provisioning ledger integrity:** migration 0006 adds database triggers that freeze request identity, subject, idempotency hash, request digest, correlation, creation and expiry claims; allow only a complete PENDING → COMPLETED transition; prevent updates after completion; and prohibit deletion.
+
+Regression tests cover revoked Worker heartbeat rejection with unchanged snapshot and no heartbeat row, replacement after challenge expiry, continued blocking by an unexpired challenge, immutable ledger claims, and valid/invalid state transitions. Test SQL fixtures were aligned with the new `superseded_at` column.
+
+**Verification status:** source and tests have been committed. CI and disposable D1-compatible execution must pass before this review can be considered cleared. No production D1 migration was applied, no Cloudflare resource or secret changed, and no enrollment/heartbeat route or Scheduler/dispatch capability was enabled. The production migration decision remains HOLD pending CI, exact migration checksums, disposable database acceptance, backup/restore readiness, and separate production authorization.
