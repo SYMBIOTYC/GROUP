@@ -208,3 +208,26 @@ An HTTPS open attempt through the available external inspection client again ret
 The dedicated Access application created in I0.9 remains present with no attached policies (default-deny); no Access policy, Service Token, Worker secret, route, application code, or enrollment/heartbeat endpoint was changed in this operation. AMPHETAMIN configuration remains untouched. I0 remains BLOCKED; no Worker is schedulable and Scheduler/dispatch remain disabled.
 
 Next gate: obtain a genuine origin-level HTTPS response and verify Access denial from an external client. Only then proceed to a narrowly scoped Service Auth policy and secure Provisioner credential provisioning. Never add an Allow policy before the credential is ready, and do not expose enrollment/heartbeat routes.
+
+
+## I0.11 — Access default-deny read-back; origin probe blocked (2026-11-28)
+
+A fresh Cloudflare API read-back of Access application `2db93e50-e75b-4674-b55e-47631a2b7acf` (`SYMBIOTYC GROUP Control Plane`) confirmed:
+
+- Protected hostname: `symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`.
+- Application type: `self_hosted`.
+- Attached policies: empty (`policies: []`).
+- Independent Access policy-list endpoint: empty result (`total_count: 0`).
+- No identity provider is allowed by the app configuration (`allowed_idps: []`).
+
+This confirms the configured Access application remains in default-deny posture at the control-plane configuration layer. It does **not** by itself prove that a request to the public hostname traverses this Access application or receives an Access denial response.
+
+An HTTPS open attempt to the exact hostname through the available external inspection client returned an internal tool error and no origin HTTP status. An HTTP attempt was normalized to HTTPS by the client and failed with the same internal error. The connected Browser tool could not run because this conversation has no originating connected-browser context. These are limitations of the available probe clients, not evidence of a Cloudflare 403, DNS failure, or origin outage.
+
+No Cloudflare resource or policy was changed. No Service Token, Allow policy, Worker secret, enrollment route, or heartbeat route was added. AMPHETAMIN remains untouched. I0 remains BLOCKED; Scheduler/dispatch remain disabled and no Worker is schedulable.
+
+### Required external verification
+
+From a normal external browser/network, request `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev/` without Cloudflare Access credentials and record the final URL, HTTP status, response headers, and whether the response is a Cloudflare Access denial page. Do not send cookies, credentials, or tokens. A 403/Access denial is the expected result for an unauthenticated request; a 404/1101/origin response must be investigated separately. If the request does not resolve or returns a TLS/DNS error, capture that exact browser error.
+
+Only after the unauthenticated denial is verified should the dedicated Provisioner Service Auth policy and secure token handoff be considered. Keep the policy default-deny until the dedicated credential exists; do not expose enrollment or heartbeat routes.
