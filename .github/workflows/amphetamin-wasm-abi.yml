@@ -1,0 +1,52 @@
+name: AMPHETAMIN wasm32 ABI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "src/amphetamin_policy.c"
+      - "src/amphetamin_policy.h"
+      - "src/amphetamin_wasm.c"
+      - "wasm-tests/amphetamin-wasm-abi.test.mjs"
+      - ".github/workflows/amphetamin-wasm-abi.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wasm-abi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install wasm32 compiler and linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+      - name: Compile the C policy as a freestanding wasm32 module
+        run: |
+          mkdir -p build
+          clang --target=wasm32 -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -nostdlib -Isrc src/amphetamin_policy.c src/amphetamin_wasm.c \
+            -Wl,--no-entry -Wl,--export-memory \
+            -Wl,--export=amphetamin_input_ptr \
+            -Wl,--export=amphetamin_output_ptr \
+            -Wl,--export=amphetamin_eval \
+            -Wl,--initial-memory=131072 -Wl,--max-memory=131072 \
+            -o build/amphetamin_policy.wasm
+      - name: Verify wasm32 ABI round-trip in Node.js
+        env:
+          AMPHETAMIN_WASM_PATH: build/amphetamin_policy.wasm
+        run: node --test wasm-tests/amphetamin-wasm-abi.test.mjs
+      - name: Upload verified wasm32 policy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: amphetamin-policy-wasm32
+          path: build/amphetamin_policy.wasm
+          if-no-files-found: error
+          retention-days: 14
