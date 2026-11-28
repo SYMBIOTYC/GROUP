@@ -406,3 +406,33 @@ The dedicated Provisioner deployment, private GROUP Service Binding authorizatio
 ## I0.23 persistence prerequisite
 
 The `worker_provisioning_requests` ledger is defined by migration `0006_worker_provisioning_requests.sql`. It binds each idempotency key hash to a Provisioner subject and request digest. This is storage only: it does not authenticate a Provisioner, issue a Worker credential, or expose a heartbeat route. Atomic enrollment must include the ledger, Worker, challenge, audit, and outbox in one D1 transaction.
+
+
+
+## I0.24 — isolated Provisioner runtime scaffold read-back (2026-11-28)
+
+A source-level read-back reconciled the earlier I0.21 runtime audit with the current repository state. The dedicated scaffold now exists at `provisioner/src/index.mjs` and `provisioner/wrangler.jsonc`. Its Worker name is `symbiotyc-group-provisioner`; `workers_dev=false` and `preview_urls=false`; it declares only the private `GROUP` Service Binding and no D1, KV, vars, secrets, Access credential, or signing-key binding. The entrypoint exposes only a blocked health response and returns `503 PROVISIONER_NOT_CONFIGURED` for enrollment. It does not call `env.GROUP`.
+
+The static layout test `tests/test_provisioner_runtime_layout.py` exists, but it was not executed in this audit. This is a quarantined repository scaffold, not a deployed Worker and not proof that Cloudflare provisioned the Service Binding. I0.21's statement that no repository scaffold existed is superseded by this read-back; the live Cloudflare deployment inventory remains a separate evidence source.
+
+## I0.25 — Worker JWT trust implementation gate (2026-11-28)
+
+A contract-to-code audit confirms that the ES256 Worker JWT profile is already normatively specified in `docs/provisioner-runtime-contract.md` and `docs/worker-identity-and-enrollment-contract.md`: fixed GROUP issuer, audience `symbiotyc.compute.worker-heartbeat.v1`, server-issued Worker subject, `registration_epoch`, `jti`, `iat`, `nbf`, `exp`, five-minute target lifetime, bounded clock skew, `kid)-based overlapping key rotation, and durable JTI/epoch/revocation checks. Therefore the next gap is not another architecture proposal; it is the missing implementation and executable verification.
+
+Current source evidence:
+- GROUP `src/index.mjs) has no Provisioner enrollment, challenge redemption, heartbeat, JWT signing, or JWT verification routes/middleware.
+- GROUP `wrangler.jsonc) declares only D1 `DB`; no private signing-key binding or public-key/JWKS verifier configuration is deployed.
+- Provisioner `src/index.mjs) remains fail-closed and does not authenticate Cloudflare Access JWTs, resolve a Provisioner subject, or call GROUP.
+- Provisioner `wrangler.jsonc) is an isolated, non-public scaffold with a GROUP Service Binding declaration only; no secret binding or deployed binding has been verified.
+- Migration `0006_worker_provisioning_requests.sql) is committed but not proven applied to production D1. Migration 0004/0005 storage and fencing do not implement cryptographic authentication.
+- The I0.20 execution-safety block on Service Token + write-only Secrets Store provisioning remains in force. Do not retry that blocked write through another tool or route.
+
+Implementation sequence, still fail-closed:
+1. Add test-first ES256 JOSE verification/signing module contracts and negative vectors: algorithm substitution/none, malformed JOSE, unknown `kid`, bad signature, issuer/audience mismatch, `nbf)/`exp)/clock-skew, wrong subject/epoch, revoked or unknown JTI, and key-rotation overlap.
+2. Define a public verification-key distribution contract that exposes no private material; keep signing private key write-only in GROUP Worker secrets and keep Provisioner without signing authority.
+3. Implement Provisioner Access JWT validation and exact machine-subject resolution only after a supported credential workflow and exact-token Access policy exist.
+4. Implement a dedicated GROUP Service Binding authentication path that cannot be invoked through public HTTP and cannot accept AMPHETAMIN principal assertions as enrollment authority.
+5. Implement challenge redemption and JWT issuance/heartbeat only after D1 migration application, atomic D1 transaction/failure-injection evidence, and negative tests are available.
+6. Deploy the isolated Provisioner and GROUP trust configuration only through separately approved security changes; verify bindings and runtime behavior without reading secret values.
+
+**I0.25 status: BLOCKED — design contract exists; ES256 issuer/verifier, Provisioner Access validation, GROUP private caller authentication, deployed secret bindings, and production D1 verification are not implemented or evidenced.** No source code, Cloudflare resource, secret, policy, route, or binding was changed in this audit. GROUP remains default-deny; AMPHETAMIN remains unchanged; Worker enrollment/heartbeat and Scheduler/dispatch remain disabled.
