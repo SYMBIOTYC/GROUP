@@ -311,3 +311,17 @@ Postflight must verify:
 No down migrations are supplied or approved. Do not use destructive DROP-based rollback on production as a routine recovery method. Prefer a reviewed forward-fix for a faulty additive schema. A restore is a separate incident action requiring verified backup availability, restore semantics, acceptable data-loss window, and explicit authorization; this review does not claim that a production restore point has been tested.
 
 **Decision:** HOLD. Resolve B1–B3 in migration source and tests, run CI plus disposable D1-compatible acceptance tests, and obtain a separate production migration authorization. I0.20 secure credential provisioning remains an independent blocker. Enrollment/heartbeat and Scheduler/dispatch stay disabled.
+
+## I0.26.6 — quarantined enrollment request preparation (2026-11-28)
+
+Added `src/provisioner-enrollment-schema.mjs` and `src/provisioner-enrollment-handler.mjs`. The preparation function composes the existing ES256 Provisioner assertion verifier with strict runtime validation of `contracts/provisioner-enrollment-request-v1.schema.json`.
+
+The verifier now returns the exact parsed body from the request clone together with its server-computed `rqh` and `ikh`. The preparation function validates and returns that same parsed object; it does not re-read or re-parse the original body. The original Request body remains readable after preparation. Validation enforces the contract's required/optional properties, `additionalProperties: false`, enum values, string bounds, schema version pattern, nested runtime shape, and capacity bounds.
+
+The function performs no D1 access or mutation and is not imported by `src/index.mjs`; no HTTP route has been added. It must only be composed behind the dedicated Provisioner Service Binding when that boundary is configured. A forged `x-symbiotyc-caller` marker cannot substitute for the signed ES256 assertion. This stage does not claim that the Service Binding origin itself has been cryptographically attested by this helper.
+
+Tests cover valid and invalid signed requests, identity/trust field injection, invalid nested capacity/runtime, optional provider resource metadata, schema version rejection, forged AMPHETAMIN marker, preservation of the original body, and absence of DB binding access.
+
+**Verification status:** runtime CI for this stage initially exposed a validator implementation defect (`Set.prototype.every`); it was corrected by normalizing the required-key collection. The corrected commit's CI result is tracked separately below and must be green before this stage is marked verified.
+
+**Security boundary:** no route, D1 migration, D1 write, credential, secret, Access policy, binding, deployment, or dispatch state changed. I0.20 credential provisioning remains blocked. The production D1 migration HOLD from I0.26.5 remains in force; B1–B3 are still the next production-readiness blockers. Enrollment/heartbeat and Scheduler/dispatch remain disabled.
