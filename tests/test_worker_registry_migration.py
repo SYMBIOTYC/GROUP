@@ -60,7 +60,7 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
             self.db.execute(
                 """INSERT INTO worker_enrollment_challenges
                 (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
-                VALUES ('challenge-2', 'worker-a', ?, 'provisioner:test', 'later', NULL, NULL, 'now')""",
+                VALUES ('challenge-2', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now', NULL)""",
                 ("b" * 64,),
             )
 
@@ -78,14 +78,14 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         self.db.execute(
             """INSERT INTO worker_enrollment_challenges
             (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
-            VALUES ('challenge-a', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now')""",
+            VALUES ('challenge-a', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now', NULL)""",
             ("c" * 64,),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
                 """INSERT INTO worker_enrollment_challenges
                 (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
-                VALUES ('challenge-b', 'worker-b', ?, 'provisioner:test', 'later', NULL, NULL, 'now')""",
+                VALUES ('challenge-b', 'worker-b', ?, 'provisioner:test', 'later', NULL, 'now', NULL)""",
                 ("c" * 64,),
             )
 
@@ -316,7 +316,7 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         self.db.execute(
             """UPDATE worker_provisioning_requests
             SET worker_id='worker-a', state='COMPLETED', outcome_code='ENROLLED',
-                outcome_json='{"worker_id":"worker-a"}', completed_at='now', updated_at='now'
+                outcome_json='{"worker_id":"worker-a"}', completed_at='now', updated_at='later'
             WHERE provisioning_request_id='request-transition'"""
         )
         with self.assertRaises(sqlite3.IntegrityError):
