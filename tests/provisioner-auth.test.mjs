@@ -5,8 +5,8 @@ import { verifyProvisionerAssertion } from "../src/provisioner-auth.mjs";
 
 const encoder = new TextEncoder();
 const now = 1_795_875_840;
-const requestDigest = "a".repeat(64);
-const idempotencyKeyHash = "c".repeat(64);
+const requestDigest = "2ba7e2793c93307244d9d36b11f78a92928d023e8ad434a729561d7ee367b29f";
+const idempotencyKeyHash = "57c3a743ecdc0f88a137b0210bf22875f9acad8dd596456db2869f796e2d1a88";
 const issuer = "https://symbiotyc-group-provisioner.internal";
 const audience = "symbiotyc.group.internal-enrollment.v1";
 const subject = "provisioner:group-enrollment";
@@ -59,7 +59,7 @@ test("accepts a valid, request-bound ES256 Provisioner assertion", async () => {
   const jwt = await f.token();
   const request = new Request("https://group.internal/internal/v1/worker-enrollments", {
     method: "POST",
-    headers: { authorization: `Bearer ${jwt}`, "x-symbiotyc-caller": "amphetamin" },
+    headers: { authorization: `Bearer ${jwt}`, "x-symbiotyc-caller": "amphetamin", "content-type": "application/json", "idempotency-key": "enroll-worker-2026-0001" },
     body: "{}"
   });
   const result = await verifyProvisionerAssertion(request, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
@@ -84,7 +84,7 @@ test("rejects an AMPHETAMIN assertion even when its marker is present", async ()
   const jwt = await f.token({ sub: "amphetamin:service" });
   const request = new Request("https://group.internal/internal/v1/worker-enrollments", {
     method: "POST",
-    headers: { authorization: `Bearer ${jwt}`, "x-symbiotyc-caller": "amphetamin" },
+    headers: { authorization: `Bearer ${jwt}`, "x-symbiotyc-caller": "amphetamin", "content-type": "application/json", "idempotency-key": "enroll-worker-2026-0001" },
     body: "{}"
   });
   const result = await verifyProvisionerAssertion(request, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
@@ -104,7 +104,7 @@ test("rejects wrong audience, expired assertion, request digest mismatch, and id
       const jwt = await f.token(claims);
       const request = new Request("https://group.internal/internal/v1/worker-enrollments", {
         method: "POST",
-        headers: { authorization: `Bearer ${jwt}` },
+        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json", "idempotency-key": "enroll-worker-2026-0001" },
         body: "{}"
       });
       const result = await verifyProvisionerAssertion(request, f.env, { requestDigest: digest, idempotencyKeyHash: keyHash, nowSeconds: now });
@@ -118,7 +118,7 @@ test("rejects algorithm substitution and invalid signatures", async () => {
   const f = await fixture();
   const wrongAlgorithm = await f.token({}, f.pair.privateKey, { alg: "none" });
   const requestA = new Request("https://group.internal/internal/v1/worker-enrollments", {
-    method: "POST", headers: { authorization: `Bearer ${wrongAlgorithm}` }, body: "{}"
+    method: "POST", headers: { authorization: `Bearer ${wrongAlgorithm}`, "content-type": "application/json", "idempotency-key": "enroll-worker-2026-0001" }, body: "{}"
   });
   const resultA = await verifyProvisionerAssertion(requestA, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
   assert.equal(resultA.ok, false);
@@ -128,7 +128,7 @@ test("rejects algorithm substitution and invalid signatures", async () => {
   );
   const wrongSignature = await f.token({}, otherPair.privateKey);
   const requestB = new Request("https://group.internal/internal/v1/worker-enrollments", {
-    method: "POST", headers: { authorization: `Bearer ${wrongSignature}` }, body: "{}"
+    method: "POST", headers: { authorization: `Bearer ${wrongSignature}`, "content-type": "application/json", "idempotency-key": "enroll-worker-2026-0001" }, body: "{}"
   });
   const resultB = await verifyProvisionerAssertion(requestB, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
   assert.equal(resultB.ok, false);
