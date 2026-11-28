@@ -56,7 +56,7 @@ test("tick sweep paginates all active tenant/project rows and uses one stable ev
   assert.equal(result.replayed, 0);
   assert.equal(db.calls.length, 3);
   assert.equal(applied.length, 205);
-  assert.ok(applied.every(([, eventId, eventType, occurredAt]) =>
+  assert.ok(applied.every(([, , eventId, eventType, occurredAt]) =>
     eventId === `tick:${Math.floor(scheduledTime / 60000)}` &&
     eventType === "tick" &&
     occurredAt === "2026-11-28T14:00:00.000Z"
