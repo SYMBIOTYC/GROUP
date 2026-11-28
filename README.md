@@ -55,6 +55,11 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - TaskResult is untrusted until schema, attempt, lease, output, and artifact integrity validation succeeds.
 - Audit and state transitions are durable and append-only; secrets and raw credentials never enter repository files or audit payloads.
 
+## Deployment configuration
+
+- [GROUP deployment record](docs/deployment-record.md)
+- [Cloudflare Worker configuration](wrangler.jsonc)
+
 ## Implementation status
 
 The repository includes the initial protocol schemas, Job API source core, D1 migration, private Service Binding contract, and passing Node/Python CI. The dedicated EU production D1 database `symbiotyc-group-compute-state` has been provisioned and the initial migration applied and verified. The Worker is not yet confirmed deployed; scheduler, dispatcher, Worker agent, provider adapter, and production dispatch remain disabled until the end-to-end acceptance gates pass.

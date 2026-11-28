@@ -255,6 +255,39 @@ async function createJob(request, env, principal, correlation) {
   return jsonResponse(202, { ...parseJobRow(row), status_url: `/v1/jobs/${row.job_id}`, replayed });
 }
 
+
+async function getCapabilities(env, principal, correlation) {
+  const dbError = databaseUnavailable(env, correlation);
+  if (dbError) return dbError;
+  let quota;
+  let policyRows;
+  try {
+    quota = await env.DB.prepare(
+      "SELECT max_active_jobs, max_cpu_millis_per_job, max_memory_mib_per_job, max_timeout_seconds FROM project_quotas WHERE tenant_id = ? AND project_id = ?"
+    ).bind(principal.tenant_id, principal.project_id).first();
+    const policies = await env.DB.prepare(
+      "SELECT operation_id, max_cpu_millis_per_job, max_memory_mib_per_job, max_timeout_seconds FROM project_operation_policies WHERE tenant_id = ? AND project_id = ? AND enabled = 1 ORDER BY operation_id"
+    ).bind(principal.tenant_id, principal.project_id).all();
+    policyRows = Array.isArray(policies.results) ? policies.results : [];
+  } catch {
+    return errorResponse(503, "DATABASE_READ_FAILED", "Compute capability policy could not be read.", correlation);
+  }
+  return jsonResponse(200, {
+    protocol: "symbiotyc.compute.v1",
+    job_submission_enabled: Boolean(quota && policyRows.length > 0),
+    enabled_operations: policyRows.map((row) => row.operation_id),
+    quota_configured: Boolean(quota),
+    dispatch_enabled: false,
+    components: {
+      job_api: "ready",
+      scheduler: "not_implemented",
+      dispatcher: "not_implemented",
+      worker_registry: "not_implemented",
+      result_pipeline: "not_implemented"
+    }
+  });
+}
+
 async function getJob(env, principal, jobId, correlation) {
   const dbError = databaseUnavailable(env, correlation);
   if (dbError) return dbError;
@@ -316,6 +349,12 @@ export default {
         protocol: "symbiotyc.compute.v1",
         dispatch_enabled: false
       });
+    }
+
+    if (request.method === "GET" && url.pathname === "/v1/capabilities") {
+      const auth = authorize(request, "compute:jobs:read", correlation);
+      if (auth.response) return auth.response;
+      return getCapabilities(env, auth.principal, correlation);
     }
 
     if (request.method === "POST" && url.pathname === "/v1/jobs") {
