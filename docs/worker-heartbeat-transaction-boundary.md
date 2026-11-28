@@ -74,3 +74,27 @@ Candidate architecture, pending an explicit provisioning decision:
 No Access application, service token, Worker secret, or production binding was created or changed during this audit. Creating/rotating a service token or entering a signing secret is a privileged credential operation and requires explicit authorization through the secure account interface.
 
 **I0 remains BLOCKED.** The immediate next action is to provision the dedicated Provisioner identity and secure credential delivery path; only then can enrollment and Worker JWT verification be implemented.
+
+
+## I0.2 — Provisioning runbook and API constraints
+
+The Cloudflare API schema was inspected read-only before provisioning:
+
+- Account Access API supports creating a dedicated self-hosted Access application and creating an account-level Access Service Token.
+- Service-token creation returns the Client Secret only once. If it is lost, the documented recovery is rotation or creating a replacement token. Therefore the secret must be captured directly into an approved secret manager/secure provisioning interface at creation time; it must not transit through chat, GitHub issues, D1, shell history, or logs.
+- Worker script secret bindings are write-only on creation and can be enumerated by binding name only. GROUP's current Worker has no such binding.
+- No endpoint or configuration was changed during this planning step.
+
+### Ordered provisioning sequence
+
+1. Approve a dedicated Access application name and a dedicated enrollment hostname/path. Do not reuse `symbiotyc-amphetamin-mcp` or its OAuth/DCR settings.
+2. Create a self-hosted Access application with a default-deny posture and an explicit Service Auth policy that includes only the dedicated Provisioner service token. Do not add owner-email, broad identity-provider, or user OAuth grants as a substitute for machine identity.
+3. Create a named, expiring Service Token for the Provisioner. Prefer a bounded lifetime (for example 90 days) rather than `forever`; document owner, rotation date, and emergency revocation procedure. Confirm the exact allowed duration and policy schema at execution time.
+4. Capture the one-time Client Secret directly in the approved secret manager or secure target configuration. The token must be sent only as the Cloudflare Access service-token headers from the Provisioner; it must never be available to Worker Agents.
+5. Add a dedicated Provisioner authentication binding to GROUP only after the application and token are active. Keep Access authentication distinct from Worker JWT issuance.
+6. Define the Worker signing model separately. Prefer asymmetric signing so GROUP stores only the private signing key and exposes a public verification key/JWKS to Worker-facing verification components; keep `kid`, rotation overlap, revocation, and issuer/audience fixed in the contract. Do not reuse the Access Service Token as JWT signing material.
+7. Verify with a non-production enrollment probe and negative tests (missing headers, wrong token, expired/disabled token, wrong audience/issuer, invalid JWT, revoked JTI) before enabling any production enrollment endpoint.
+
+### Execution guard
+
+This runbook is design-only. Creating the Access app, policy, token, or Worker secret changes account security posture and creates credentials. Those actions require explicit approval and secure credential handling. Until those steps are completed and verified, I0 remains blocked and Worker registration/heartbeat remain unavailable.
