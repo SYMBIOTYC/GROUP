@@ -440,3 +440,21 @@ A read-only review of Cloudflare's current D1 documentation and account API esta
 
 **Decision: HOLD.** This stage is blocked on owner approval for (1) exporting production data and accepting the documented temporary query unavailability, (2) enabling/choosing an independent backup destination, and (3) creating a disposable remote D1 database for the restore/import rehearsal. No production migration 0004–0006 is authorized. Enrollment, heartbeat, Scheduler, and dispatch remain disabled. After backup/restore evidence is complete, compute and archive SHA-256 checksums for the exact migration artifacts and obtain separate explicit production migration authorization.
 
+
+
+## I0.26.12 — approved restore target created; R2 activation blocked (2026-11-28)
+
+The owner explicitly approved (a) production D1 export to independent storage, (b) R2 enablement and use as the independent destination, and (c) a separate disposable remote D1 restore target.
+
+**Completed:**
+- Created isolated remote D1 database `symbiotyc-group-compute-state-restore-drill-20261128`, UUID `0ade0a88-ccfe-454a-852b-f8d7efb023c9`, jurisdiction `eu`. Read-back confirmed the exact name/UUID. A read-only `sqlite_master` query found only Cloudflare's internal `_cf_KV` table; the target is otherwise empty and contains no production data.
+- No production database was changed.
+
+**R2 blocker:**
+- Both R2 bucket listing and an authorized bucket-create attempt returned HTTP 403, Cloudflare error `10042`: `Please enable R2 through the Cloudflare Dashboard.`
+- The Cloudflare API specification exposes bucket create/list/object operations but no account-level R2 activation endpoint. Current Cloudflare instructions require R2 purchase/activation through the Dashboard before R2 API credentials and bucket operations become available.
+- This session has no approved Dashboard UI/RemoteView capability. No alternate remote-desktop path was used. No R2 bucket, token, object, or billing configuration was created or changed.
+
+**Not performed:** no production D1 export, signed URL download, R2 upload, import, or restore. The production database remains untouched. The disposable restore target is provisioned but empty.
+
+**Next gate:** R2 must be activated for the Primary Cloudflare account through an owner-approved Dashboard capability. After activation is independently verified, create a private EU/EEUR bucket with public managed domain disabled, verify bucket access, then perform the previously approved D1 export during a controlled maintenance window, transfer the SQL dump directly into that bucket without exposing the signed URL or SQL contents in chat, compute SHA-256, and run the import/restore drill only against the disposable D1 target. Do not proceed with production migrations 0004–0006 until this evidence and separate migration authorization exist.
