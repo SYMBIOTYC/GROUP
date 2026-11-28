@@ -310,3 +310,12 @@ Consequently, this session cannot create a Cloudflare Service Token and safely d
 4. Create the GROUP Service Auth Allow policy using only that token's exact ID; independently verify the policy and unauthenticated/wrong-token denial.
 
 Until this capability gate is resolved, keep GROUP Access `default-deny` (`policies: []`). Do not create a token and then expose its secret in a tool result, chat, Git, D1, CI output, or logs. Do not use Desktop Commander, AWS, shell history, or chat as a substitute. AMPHETAMIN remains untouched. Worker JWT trust remains a separate subsequent blocker; no enrollment/heartbeat route or dispatch path is enabled, and no Worker is schedulable.
+
+
+## I0.15 — RemoteView runtime tool registration check (2026-11-28)
+
+The installed `symbiotyc-remoteview` skill documentation is present and defines `remote_pair`, `remote_status`, `remote_execute`, and `remote_job_result`. However, the current session's callable tool registry contains no Symbiotyc RemoteView namespace or any of those operations. A readable skill is not proof that its MCP server is connected or callable. The only exposed remote desktop namespace is Desktop Commander, which is explicitly not an approved substitute and was not invoked.
+
+No pairing request was sent, no pairing code/session token was generated, no device state was queried, and no local machine was accessed. I0.14 remains blocked specifically on exposing/connecting the approved Symbiotyc RemoteView MCP tools to this ChatGPT runtime (or using the approved RemoteView client directly outside this session). Once the tools appear, the safe sequence is `remote_pair` once, user-side entry of the one-time pairing code in the local companion installer, then `remote_status` requiring a heartbeat younger than 20 seconds. Only then may a secure destination be prepared and Provisioner secret provisioning be separately authorized.
+
+No Cloudflare resources, Service Tokens, Access policies, worker bindings, or routes changed. GROUP remains default-deny; AMPHETAMIN untouched; no Worker is schedulable and Scheduler/dispatch remain disabled.
