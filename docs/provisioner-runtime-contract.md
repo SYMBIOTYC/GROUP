@@ -214,3 +214,24 @@ The integration test exposed an additional fail-closed edge case: the Worker row
 **Security boundary:** no production D1 query, migration, Cloudflare binding, secret, Access policy, Worker deployment, route, or scheduler configuration was changed. The resolver remains isolated and is not wired into `verifyWorkerJwt()`. Enrollment/heartbeat and Scheduler/dispatch remain disabled.
 
 Next gate: run the committed SQLite integration test in the repository CI against the complete checked-in migration files, then perform a read-only schema inventory against the intended production D1 database. Do not enable routes until that evidence and the independent signing/key-rotation and transaction rollback gates exist.
+
+
+## I0.24.3 — GROUP-side canonical request binding (2026-11-28)
+
+Added `src/provisioner-request-binding.mjs` and made `verifyProvisionerAssertion()` derive the signed request binding from the actual inbound `Request`, rather than accepting digest values supplied by its caller.
+
+The helper currently enforces the quarantined enrollment request boundary:
+- exact `POST /internal/v1/worker-enrollments` method/path and no query string;
+- a printable 8–128 character `Idempotency-Key`;
+- `application/json` content type and a non-empty JSON object body;
+- a 64 KiB body ceiling and bounded canonicalization depth;
+- deterministic sorted-key JSON canonicalization matching the Provisioner signer;
+- SHA-256 over the canonical `{method,path,body}` envelope and a separate SHA-256 over the actual received idempotency key.
+
+The helper reads `request.clone()`, so the original body stream remains available to a future handler. The verifier ignores caller-supplied digest options and digest headers; only the recomputed values are compared with JWT claims `rqh` and `ikh`. The tests include deliberately forged digest headers, changed method/path/body, query strings, changed idempotency keys, malformed bodies and content types, and signer-to-verifier interoperability.
+
+**Verification status:** the new tests are committed, but a GitHub Actions run for this exact change has not yet been confirmed. Do not treat this step as CI-green until the runtime workflow for the resulting commit completes successfully.
+
+**Security/deployment boundary:** this is still a non-routed verification primitive. No enrollment route calls it; the helper does not mutate D1 or consume the request body seen by a future handler. No Service Token, secret, Access policy, binding, D1 migration, Worker deployment, or Scheduler/dispatch setting changed. I0.20 secure credential provisioning remains blocked; enrollment and heartbeat remain disabled.
+
+Next: verify the runtime CI result, then add an isolated private-boundary composition test proving that the GROUP handler can authenticate the Provisioner and safely pass the same parsed body to validation without enabling a public route.
