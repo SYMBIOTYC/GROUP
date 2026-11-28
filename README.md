@@ -111,3 +111,7 @@ The deployed GROUP Worker `DB` binding was resolved read-only to production data
 ## I0.26.5 — production D1 migration rollout review
 
 **HOLD — migrations 0004–0006 are not approved for production application.** Source review found three blockers: 0005 heartbeat triggers omit the independent Worker `revoked_at` guard; 0004's one-unconsumed-challenge index lets expired challenges block replacement; and 0006 lacks immutable idempotency-claim/state-transition guards. See [runtime contract](docs/provisioner-runtime-contract.md#i0265--production-d1-migration-rollout-review-2026-11-28), [F2.3 transaction gate](docs/worker-heartbeat-transaction-boundary.md#i0265--production-d1-migration-rollout-review-2026-11-28), and [identity contract](docs/worker-identity-and-enrollment-contract.md#i0265-migration-review-findings). No production D1 changes were made.
+
+## I0.26.6 — quarantined enrollment request preparation
+
+Added a preparation-only GROUP module that composes ES256 Provisioner assertion verification with strict enrollment-contract validation. It consumes the same parsed body produced by request-binding verification and preserves the original request stream. It performs no D1 access and is not wired to a route. Runtime CI is being rerun after correcting a validator defect caught by the first run. The I0.26.5 production D1 migration HOLD and B1–B3 blockers remain unchanged.
