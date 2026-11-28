@@ -26,6 +26,7 @@ export function validateActivationState(state) {
   integer(state.recovery_remainder_minutes, "state.recovery_remainder_minutes", 0, 59);
   integer(state.version, "state.version", 0);
   timestamp(state.updated_at, "state.updated_at");
+  return state;
 }
 
 function validatePolicy(policy) {
