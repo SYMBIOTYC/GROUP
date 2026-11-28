@@ -84,3 +84,10 @@ BEFORE DELETE ON worker_provisioning_requests
 BEGIN
   SELECT RAISE(ABORT, 'provisioning request ledger is append-only');
 END;
+
+CREATE TRIGGER IF NOT EXISTS worker_provisioning_requests_initial_pending
+BEFORE INSERT ON worker_provisioning_requests
+WHEN NEW.state != 'PENDING'
+BEGIN
+  SELECT RAISE(ABORT, 'provisioning requests must be created as PENDING');
+END;
