@@ -67,7 +67,10 @@ export async function createAmphetaminWasmEvaluator(wasmModule) {
     throw new TypeError("AMPHETAMIN_POLICY must be a compiled WebAssembly.Module");
   }
   const instance = await WebAssembly.instantiate(wasmModule);
-  const { memory, amphetamin_input_ptr, amphetamin_output_ptr, amphetamin_eval } = instance.exports;
+  const { memory, amphetamin_abi_version, amphetamin_input_ptr, amphetamin_output_ptr, amphetamin_eval } = instance.exports;
+  if (typeof amphetamin_abi_version !== "function" || amphetamin_abi_version() !== 1) {
+    throw new TypeError("AMPHETAMIN WASM ABI version mismatch; expected v1");
+  }
   if (!(memory instanceof WebAssembly.Memory) ||
       typeof amphetamin_input_ptr !== "function" ||
       typeof amphetamin_output_ptr !== "function" ||
