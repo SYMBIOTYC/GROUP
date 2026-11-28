@@ -59,6 +59,8 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 ## Worker identity and enrollment
 
 - [Worker Identity and Enrollment Contract v1](docs/worker-identity-and-enrollment-contract.md) — provisioner/agent trust separation, one-time enrollment, short-lived Worker credentials, heartbeat fencing and release gates.
+- `migrations/0004_worker_registry.sql` — durable Worker, capability, one-time challenge, credential, heartbeat and append-only audit tables. Storage foundation only; no enrollment or heartbeat routes are enabled.
+- `tests/test_worker_registry_migration.py` — SQLite migration invariants for tenant/project binding, challenge uniqueness, heartbeat sequence uniqueness and append-only audit.
 
 ## Deployment configuration
 
