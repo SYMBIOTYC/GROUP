@@ -42,6 +42,7 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - [AMPHETAMIN MCP contract](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-MCP.md)
 - [Compute Control Plane](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Compute-Control-Plane.md)
 - [Worker Registry](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Worker-Registry.md)
+- [AMPHETAMIN quality-weighted randomized Worker scaling](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-Quality-Weighted-Random-Worker-Scaling.md)
 - [Execution Lifecycle](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Execution-Lifecycle.md)
 - [Live deployment verification (2026-11-28)](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md)
 
@@ -135,7 +136,7 @@ I0.26.8 production D1 read-only preflight: target DB is confirmed, but productio
 
 ## I0.26.9 — disposable local D1 migration acceptance
 
-CI now applies migrations 0001–0006 through Wrangler v4 against an isolated local D1 database and asserts six migration ledger rows, all nine critical Worker Registry security triggers, and zero FK violations. Run #298 passed (94/94 runtime tests, 22 migration tests, 8 resolver tests, local D1 acceptance); schema conformance run #305 passed. Production D1 remains unchanged and rollout HOLD pending independent backup/restore rehearsal and explicit authorization.
+Mainline CI run #298 validated migrations 0001–0006 against an isolated local D1 database (94/94 runtime tests, 22 Worker Registry migration tests, 8 resolver tests); schema conformance run #305 passed. The AMPHETAMIN integration extends this gate through migration 0007 and asserts seven migration ledger rows, twelve security triggers, both AMPHETAMIN activation tables, and zero foreign-key violations. Production D1 remains unchanged; rollout remains HOLD pending backup/restore readiness and explicit authorization.
 
 ## I0.26.10 — production backup/restore readiness audit
 
@@ -156,3 +157,15 @@ I0.26.13 (2026-11-28): Dropbox was approved as an independent-backup alternative
 
 
 I0.26.14 (2026-11-28): Next backup blocker is the missing isolated Cloudflare→Dropbox relay and dedicated Dropbox OAuth credential. Dropbox upload sessions require files.content.write; D1 export URL is temporary (one hour) and export can block source queries. The connected Dropbox MCP token is not exportable and must not be reused. Proposed separate relay Worker must stream bounded chunks, keep URL/token/SQL out of chat and logs, and verify SHA-256. No app/token/secret/Worker or production export created. See [heartbeat backup gate](docs/worker-heartbeat-transaction-boundary.md#i02614--dropbox-server-side-backup-relay-trust-boundary-2026-11-28).
+
+
+## AMPHETAMIN policy runtime — integration candidate
+
+The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssembly ABI v1 evaluator are carried on a fresh integration branch based on the latest GROUP mainline. The WASM Worker entrypoint is `src/worker.mjs`; it delegates existing routes to `src/index.mjs` and lazily instantiates the policy module for `POST /v1/activation/evaluate`.
+
+- Activation-state migration: `migrations/0007_amphetamin_activation_state.sql`, following current mainline migrations 0001–0006. Not applied to production.
+- Native C/WASM parity: 14 fixed vectors plus 5,000 seeded valid inputs.
+- External activation producers may submit deployment events only; tick events are rejected at the HTTP boundary and reserved for the internal GROUP controller.
+- Activation state update and event application require paired D1 batch results; a migration trigger aborts event application unless the preceding state CAS changed exactly one row.
+- The principal assertion is trusted only on the private AMPHETAMIN Service Binding boundary. The live workers.dev hostname is enabled and the Access application has no policies; private-only ingress is not proven. Keep the candidate Draft/HOLD until ingress is secured and independently verified.
+- Evaluation is policy-decision only. Dispatch, provisioning, and production rollout remain disabled.
