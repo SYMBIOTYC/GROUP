@@ -49,7 +49,7 @@ test("signer output is accepted by GROUP verifier with identical request binding
   assert.match(signed.token, /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
   const request = new Request("https://group.internal/internal/v1/worker-enrollments", {
     method: input.method,
-    headers: { authorization: `Bearer ${signed.token}` },
+    headers: { authorization: `Bearer ${signed.token}`, "content-type": "application/json", "idempotency-key": idempotencyKey, "x-symbiotyc-request-digest": "0".repeat(64), "x-symbiotyc-idempotency-hash": "1".repeat(64) },
     body: JSON.stringify(input.body)
   });
   const verified = await verifyProvisionerAssertion(request, f.verifierEnv, {
