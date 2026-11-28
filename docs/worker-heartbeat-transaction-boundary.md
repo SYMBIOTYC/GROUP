@@ -512,7 +512,7 @@ GROUP now has `src/provisioner-request-binding.mjs`. The Provisioner assertion v
 
 Negative tests cover forged digest headers, changed method/path/body, query strings, malformed or missing idempotency keys, invalid JSON, array bodies, and incorrect content type. The signer/verifier interoperability test now supplies forged digest headers to prove they are ignored.
 
-**Verification:** tests are committed; the exact resulting GitHub Actions runtime run has not yet been confirmed. No test pass is claimed here.
+**Verification:** GitHub Actions commit `001473f90f11d79b71accb411a456a39d7c5785e`: runtime suite 85/85 passed (run #227, ID `46154700766`); schema/conformance workflow passed (run #233, ID `46154700753`).
 
 **Boundary:** verifier and helper remain unwired to a route. No D1 write, credential, secret, Access policy, Cloudflare binding, deployment, or dispatch state changed. GROUP remains default-deny; AMPHETAMIN remains unchanged; enrollment/heartbeat and Scheduler/dispatch remain disabled.
 
