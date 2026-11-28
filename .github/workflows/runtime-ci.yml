@@ -27,3 +27,7 @@ jobs:
         run: |
           python tests/test_worker_registry_migration.py
           python tests/test_worker_credential_resolver_sqlite.py
+      - name: Apply all migrations to disposable local D1 and assert security triggers
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: bash tests/d1-migration-acceptance.sh
