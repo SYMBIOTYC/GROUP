@@ -153,6 +153,9 @@ export async function verifyWorkerJwt(token, options = {}) {
 
   if (payload.iat > now + skew) reject("issued-at time is in the future");
   if (payload.nbf > now + skew) reject("token is not yet valid");
+  if (payload.nbf < payload.iat - skew || payload.nbf >= payload.exp) {
+    reject("invalid nbf/exp time ordering");
+  }
   if (payload.exp <= now - skew) reject("token has expired");
   if (payload.exp <= payload.iat || payload.exp - payload.iat > maxLifetime) {
     reject("token lifetime exceeds the configured maximum");
