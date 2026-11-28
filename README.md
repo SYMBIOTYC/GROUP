@@ -129,3 +129,6 @@ GitHub Actions verification completed successfully on implementation commit `25c
 The first Python CI attempt exposed a test-fixture timestamp issue in the PENDING → COMPLETED transition test. The fixture was corrected to advance `updated_at`; the successful run above validates the corrected commit. These tests execute against disposable in-memory SQLite databases initialized from the checked-in migrations, not the production D1 database.
 
 **Result:** source-level B1–B3 blockers are addressed and the migration regression suites pass. Production rollout remains HOLD: no migrations have been applied to production D1, no live route/binding/secret has changed, and separate backup/restore readiness plus explicit production migration authorization are still required.
+
+
+I0.26.8 production D1 read-only preflight: target DB is confirmed, but production ledger contains only migrations 0001–0003 and no Worker Registry schema. Migrations 0004–0006 remain unapplied; rollout HOLD. See [heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i0268--production-d1-read-only-preflight-2026-11-28).
