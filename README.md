@@ -2,7 +2,7 @@
 
 **Role:** Compute Control Plane for the SYMBIOTYC Cloud federation.  
 **Protocol:** `symbiotyc.compute.v1`  
-**Status:** Contract-first bootstrap; no production service or dispatch is claimed.
+**Status:** Production D1 provisioned and initial schema applied; Worker deployment and private Service Binding are in progress. No compute dispatch is enabled.
 
 GROUP owns compute-resource coordination across `CLOUD-COMPUTE`, `CLOUD-CPU`, and `CLOUD-VPS`. It is the authority for Worker registration and eligibility, scheduling, capacity reservations, dispatch coordination, quotas, policy, lifecycle state, and audit.
 
@@ -32,6 +32,7 @@ GROUP — Compute Control Plane
 - `contracts/` — machine-readable protocol schemas.
 - `docs/architecture.md` — authority boundaries and component model.
 - `tests/` — schema conformance tests.
+- `wrangler.toml` — private Worker configuration with `workers_dev=false`, `preview_urls=false`, no routes, and the dedicated EU D1 binding.
 
 ## Canonical documentation
 
@@ -56,4 +57,4 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 
 ## Implementation status
 
-The repository now includes the initial protocol schemas, Job API source core, D1 migration, private Service Binding contract, and passing Node/Python CI. It does not implement a deployed API, provisioned database, scheduler, dispatcher, Worker agent, provider adapter, or production deployment. Production dispatch remains disabled until the security, persistence, worker, quota, artifact, and end-to-end acceptance gates pass.
+The repository includes the initial protocol schemas, Job API source core, D1 migration, private Service Binding contract, and passing Node/Python CI. The dedicated EU production D1 database `symbiotyc-group-compute-state` has been provisioned and the initial migration applied and verified. The Worker is not yet confirmed deployed; scheduler, dispatcher, Worker agent, provider adapter, and production dispatch remain disabled until the end-to-end acceptance gates pass.
