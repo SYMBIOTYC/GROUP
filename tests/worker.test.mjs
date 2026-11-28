@@ -299,7 +299,15 @@ test("Tenant A cannot cancel Tenant B Job or create audit/outbox side effects", 
       return {
         sql,
         bind(...values) {
-          return { sql, values };
+          return {
+            sql,
+            values,
+            first: async () => {
+              assert.match(sql, /WHERE job_id = \\? AND tenant_id = \\? AND project_id = \\?/);
+              assert.deepEqual(values, [tenantBJob.job_id, "tenant-a", "project-a"]);
+              return null;
+            }
+          };
         }
       };
     },
