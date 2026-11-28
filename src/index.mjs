@@ -1,4 +1,5 @@
 import { canonicalJson, sha256Hex, validateJobIntent } from "./job-intent.mjs";
+import { createApproval, consumeApproval } from "./approvals.mjs";
 
 const SERVICE_NAME = "symbiotyc-group-control-plane";
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -355,6 +356,18 @@ export default {
       const auth = authorize(request, "compute:jobs:read", correlation);
       if (auth.response) return auth.response;
       return getCapabilities(env, auth.principal, correlation);
+    }
+
+    if (request.method === "POST" && url.pathname === "/v1/approvals") {
+      const auth = authorize(request, "compute:approvals:write", correlation);
+      if (auth.response) return auth.response;
+      return createApproval(request, env, auth.principal, correlation);
+    }
+    const approvalMatch = url.pathname.match(/^\/v1\/approvals\/([0-9a-f-]{36})\/consume$/i);
+    if (request.method === "POST" && approvalMatch) {
+      const auth = authorize(request, "compute:approvals:consume", correlation);
+      if (auth.response) return auth.response;
+      return consumeApproval(request, env, auth.principal, approvalMatch[1], correlation);
     }
 
     if (request.method === "POST" && url.pathname === "/v1/jobs") {
