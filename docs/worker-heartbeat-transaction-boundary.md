@@ -319,3 +319,10 @@ The installed `symbiotyc-remoteview` skill documentation is present and defines 
 No pairing request was sent, no pairing code/session token was generated, no device state was queried, and no local machine was accessed. I0.14 remains blocked specifically on exposing/connecting the approved Symbiotyc RemoteView MCP tools to this ChatGPT runtime (or using the approved RemoteView client directly outside this session). Once the tools appear, the safe sequence is `remote_pair` once, user-side entry of the one-time pairing code in the local companion installer, then `remote_status` requiring a heartbeat younger than 20 seconds. Only then may a secure destination be prepared and Provisioner secret provisioning be separately authorized.
 
 No Cloudflare resources, Service Tokens, Access policies, worker bindings, or routes changed. GROUP remains default-deny; AMPHETAMIN untouched; no Worker is schedulable and Scheduler/dispatch remain disabled.
+
+
+## I0.16 — Authentication contract drift correction (2026-11-28)
+
+A cross-check of `docs/auth-service-contract.md` against the I0.8–I0.11 Cloudflare read-backs found stale assertions that GROUP workers.dev was disabled and Cloudflare Access was absent. The live configuration is different: GROUP workers.dev is enabled, Preview URLs are disabled, and a dedicated self-hosted Access application (`2db93e50-e75b-4674-b55e-47631a2b7acf`) is attached to the hostname with no policies (default-deny). This is a configuration fact, not proof of request-level enforcement.
+
+The auth contract has been corrected to distinguish the intended private-only target (`workers_dev=false`) from the current exposure deviation. External unauthenticated Access denial, DNS/TLS/origin reachability, and enforcement remain unverified; the normal-browser probe is still required. The document now explicitly warns that the AMPHETAMIN principal headers are trusted only over the private Service Binding and are not public authentication. No Cloudflare configuration, Access policy, token, Worker binding, route, or application code changed. AMPHETAMIN remains untouched; enrollment/heartbeat and dispatch remain disabled.
