@@ -130,3 +130,32 @@ test("rejects unsupported method and path without exposing enrollment data", asy
   const result = await prepareProvisionerEnrollment(altered, f.verifierEnv, { nowSeconds: now });
   assert.equal(result.ok, false);
 });
+
+test("accepts the optional bounded provider resource identifier", async () => {
+  const f = await fixture();
+  const body = { ...validBody, provider_resource_id: "provider-instance-123" };
+  const result = await prepareProvisionerEnrollment(await signedRequest(f, body), f.verifierEnv, { nowSeconds: now });
+  assert.equal(result.ok, true);
+  assert.equal(result.enrollmentRequest.provider_resource_id, "provider-instance-123");
+});
+
+test("rejects an unsupported schema version even with a valid signature", async () => {
+  const f = await fixture();
+  const body = { ...validBody, schema_version: "2.0" };
+  const result = await prepareProvisionerEnrollment(await signedRequest(f, body), f.verifierEnv, { nowSeconds: now });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "PROVISIONER_ENROLLMENT_SCHEMA_INVALID");
+});
+
+test("does not inspect or mutate the database binding", async () => {
+  const f = await fixture();
+  const request = await signedRequest(f);
+  const env = new Proxy(f.verifierEnv, {
+    get(target, property) {
+      if (property === "DB") throw new Error("DB binding must not be accessed");
+      return target[property];
+    }
+  });
+  const result = await prepareProvisionerEnrollment(request, env, { nowSeconds: now });
+  assert.equal(result.ok, true);
+});
