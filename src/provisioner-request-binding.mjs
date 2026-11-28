@@ -1,5 +1,5 @@
 const SHA256_HEX = /^[a-f0-9]{64}$/;
-const IDEMPOTENCY_KEY = /^[\\x21-\\x7e]{8,128}$/;
+const IDEMPOTENCY_KEY = /^[\x21-\x7e]{8,128}$/;
 const EXPECTED_METHOD = "POST";
 const EXPECTED_PATH = "/internal/v1/worker-enrollments";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -41,7 +41,7 @@ export async function computeProvisionerRequestBinding(request) {
 
     const url = new URL(request.url);
     if (url.pathname !== EXPECTED_PATH || url.search || url.hash ||
-        !url.pathname.startsWith("/internal/") || url.pathname.includes("\\")) {
+    if (url.pathname !== EXPECTED_PATH || url.search || url.hash ||
       return failure();
     }
 
