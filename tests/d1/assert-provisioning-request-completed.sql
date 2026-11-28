@@ -5,6 +5,8 @@ SELECT CASE WHEN
   AND
   (SELECT request_digest FROM worker_provisioning_requests WHERE provisioning_request_id = 'request-d1-test') = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
   AND
+  (SELECT worker_id FROM worker_provisioning_requests WHERE provisioning_request_id = 'request-d1-test') = 'worker-d1-revoked'
+  AND
   (SELECT outcome_code FROM worker_provisioning_requests WHERE provisioning_request_id = 'request-d1-test') = 'ENROLLED'
 THEN 1 ELSE 0 END;
 DROP TABLE d1_test_assertions;
