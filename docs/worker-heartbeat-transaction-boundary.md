@@ -46,3 +46,31 @@ The service must reject invalid signature/claims, wrong audience/issuer, expired
 **I0 — Provisioner trust authority:** BLOCKED until the independent identity issuer, trust configuration, key rotation/revocation procedure, and authenticated enrollment path are deployed and verified.
 
 Until I0 passes: registration and heartbeat endpoints remain absent/disabled; no Worker becomes eligible; Scheduler and dispatch remain disabled. SQLite migration tests are not proof of Cloudflare D1 production behavior, and no CI result is claimed by this design record.
+
+
+## I0 account-side audit — 2026-11-28
+
+A read-only inventory of the linked Cloudflare **Primary** account was performed. No secret values were requested or read.
+
+- Account-level Access Service Token inventory returned an empty list.
+- The only Access application returned was `SYMBIOTYC AMPHETAMIN MCP`, with an owner-email allow policy and OAuth/DCR configuration. No dedicated Provisioner Access application was present.
+- Worker secret-binding metadata for `symbiotyc-group-control-plane` returned an empty list.
+- GROUP's deployed Worker settings exposed only the `DB` D1 binding; no JWT signing/verifier secret binding was present.
+- The AMPHETAMIN Worker had the private `GROUP` Service Binding and `RUNTIME_DB`, but no Worker secret bindings in the inspected metadata.
+- The deployed Worker inventory contains GROUP and AMPHETAMIN, but no separately named Provisioner Worker.
+
+This is account-side configuration evidence for the inspected Primary account at the review date. It does not prove that no external identity provider exists outside this Cloudflare account, but none is configured in the inspected GROUP Worker bindings or Access inventory.
+
+## I0 decision and next implementation boundary
+
+There is currently no configured Cloudflare Access Service Token to authenticate an infrastructure Provisioner, and no signing/verifier secret binding on GROUP. Therefore no enrollment credential can be issued or verified safely in the current deployment.
+
+Candidate architecture, pending an explicit provisioning decision:
+
+- A dedicated, narrowly scoped Cloudflare Access self-hosted application and service token may authenticate the Provisioner-to-enrollment control path. It must be separate from the AMPHETAMIN Access application and its user OAuth/DCR policy.
+- The Worker Agent credential remains a separate short-lived signed credential, issued only after authorized one-time enrollment. A Provisioner Access Service Token must never be copied to Workers or treated as a Worker heartbeat credential.
+- GROUP's signing key and any verifier trust configuration must be deployed through Worker secret bindings. Secret values must be entered through the authorized secure interface; never paste them into chat, Git, D1, or logs.
+
+No Access application, service token, Worker secret, or production binding was created or changed during this audit. Creating/rotating a service token or entering a signing secret is a privileged credential operation and requires explicit authorization through the secure account interface.
+
+**I0 remains BLOCKED.** The immediate next action is to provision the dedicated Provisioner identity and secure credential delivery path; only then can enrollment and Worker JWT verification be implemented.
