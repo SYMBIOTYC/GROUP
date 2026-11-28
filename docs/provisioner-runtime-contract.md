@@ -105,3 +105,14 @@ Add a migration-backed `worker_provisioning_requests` ledger with provisioner su
 - **I0.27:** negative tests and staging acceptance.
 
 No runtime code, migration, Cloudflare resource, Access policy, Service Token, secret, route, or Worker binding changed in this design step. GROUP remains default-deny; AMPHETAMIN unchanged; enrollment/heartbeat/Scheduler/dispatch disabled.
+
+
+## I0.23 — durable idempotency ledger
+
+Migration `0006_worker_provisioning_requests.sql` adds `worker_provisioning_requests` with a subject-scoped unique key on `(provisioner_subject, idempotency_key_hash)`, a fixed-length lowercase SHA-256 request digest, optional Worker foreign key, explicit PENDING/COMPLETED lifecycle, bounded outcome metadata, correlation ID, timestamps, and expiry index. Raw idempotency keys are not stored.
+
+The enrollment handler must compare the stored request digest on every key replay: same subject/key and same digest resolves to the existing request; same subject/key with a different digest returns 409 without creating or mutating a Worker. The ledger row, Worker, challenge, audit, and outbox must commit in one D1 transaction. A PENDING row must never be committed as a partial enrollment. Completed rows are retained through `expires_at`; cleanup/retention execution remains a separate controlled operation and must not silently permit key reuse before expiry.
+
+The migration is a schema artifact only. It has not been applied to production D1, and no enrollment route is enabled. SQLite schema smoke checks were executed for subject-scoped uniqueness, cross-subject isolation, hash validation, and Worker foreign-key enforcement; the repository's complete Python test module and D1 transaction/failure-injection suite have not been run.
+
+**I0.23 status:** migration and focused test cases committed; production D1 application and D1-compatible atomicity proof remain outstanding.
