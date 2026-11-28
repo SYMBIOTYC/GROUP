@@ -42,6 +42,7 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - [AMPHETAMIN MCP contract](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-MCP.md)
 - [Compute Control Plane](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Compute-Control-Plane.md)
 - [Worker Registry](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Worker-Registry.md)
+- [AMPHETAMIN quality-weighted randomized Worker scaling](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-Quality-Weighted-Random-Worker-Scaling.md)
 - [Execution Lifecycle](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Execution-Lifecycle.md)
 - [Live deployment verification (2026-11-28)](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md)
 
@@ -129,3 +130,13 @@ GitHub Actions verification completed successfully on implementation commit `25c
 The first Python CI attempt exposed a test-fixture timestamp issue in the PENDING → COMPLETED transition test. The fixture was corrected to advance `updated_at`; the successful run above validates the corrected commit. These tests execute against disposable in-memory SQLite databases initialized from the checked-in migrations, not the production D1 database.
 
 **Result:** source-level B1–B3 blockers are addressed and the migration regression suites pass. Production rollout remains HOLD: no migrations have been applied to production D1, no live route/binding/secret has changed, and separate backup/restore readiness plus explicit production migration authorization are still required.
+
+
+## AMPHETAMIN policy runtime — mainline integration
+
+The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssembly ABI v1 evaluator are integrated against the current GROUP mainline. The WASM Worker entrypoint is `src/worker.mjs`; it delegates existing routes to `src/index.mjs` and lazily instantiates the policy module for `POST /v1/activation/evaluate`.
+
+- Activation-state migration: `migrations/0007_amphetamin_activation_state.sql`, after mainline migrations 0004–0006. Not applied to production.
+- Native C/WASM parity: 14 fixed vectors plus 5,000 seeded valid inputs.
+- Current mainline Worker Registry / Provisioner migration hardening and regression tests are retained unchanged.
+- Evaluation is policy-decision only. Dispatch, provisioning, and production rollout remain disabled.
