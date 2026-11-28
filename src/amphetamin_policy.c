@@ -99,7 +99,7 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
     if (upper > budget_cap) upper = budget_cap;
 
     if (upper == 0u) {
-        return decision(AMPHETAMIN_REFILL, 0u, 1u, 4u);
+        return decision(AMPHETAMIN_REFILL, 0u, 1u, 0u, 4u);
     }
 
     /* Uniform bounded choice. Host must supply a CSPRNG value. */
