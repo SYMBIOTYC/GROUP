@@ -712,3 +712,20 @@ The owner explicitly approved the I0.26.11 production export. A Cloudflare D1 SQ
 Production D1 was not modified by this export. The previously created disposable restore database `symbiotyc-group-compute-state-restore-drill-20261128` remains the only authorized restore target; it has not received production data. No production migrations were applied. Enrollment, heartbeat, Scheduler, and dispatch remain disabled.
 
 **Next gate:** activate R2 through an owner-approved Cloudflare Dashboard capability (or expose a reviewed server-to-server transfer tool into an already approved private destination). Then generate a fresh D1 export, stream it directly to the independent destination without returning the signed URL or SQL contents to the conversation, verify object metadata and SHA-256, and perform the restore rehearsal only against the disposable D1 target. Record measured restore duration and bookmark-based RPO. Do not infer backup success from Cloudflare's temporary export completion alone.
+
+
+## I0.26.14 — production D1 export execution (2026-11-28)
+
+The owner explicitly authorized a full SQL export of the production D1 database `symbiotyc-group-compute-state`. Cloudflare D1 export API completed successfully with `compatibility=d1` and no table filter (`status=complete`). Cloudflare reported one uploaded export part.
+
+- Database UUID: `633d7c14-d335-426c-be7e-2168a43171bc` (production, EU/EEUR).
+- Export file: `633d7c14-d335-426c-be7e-2168a43171bc-00000014-00000000-00005131-e4291b1cd77dae6d34db3869e6bd802b.sql`.
+- Export bookmark: `00000014-00000000-00005131-e4291b1cd77dae6d34db3869e6bd802b`.
+- Pre-export and post-export Time Travel bookmark values matched. Post-export metadata read-back still reports 11 tables, 159,744 bytes, and read replication disabled.
+- Cloudflare returned a temporary signed download URL with a one-hour validity window. The URL is intentionally not recorded in Git or chat.
+
+**Integrity and retention limitation:** the export task completed and Cloudflare reported the SQL object uploaded, but this session could not securely download/stream the binary into an owner-controlled independent destination. No durable independent copy, local file, SHA-256 digest, SQL-content inspection, import, or restore rehearsal is claimed. The temporary signed URL is not a long-term backup and must be treated as an expiring bearer credential. The export is **generated but not yet independently retained or integrity-verified**.
+
+No production SQL was edited, no migrations were applied, and no restore was attempted. The disposable EU restore-drill D1 remains separate. Production migrations 0004–0006 remain HOLD; enrollment, heartbeat, Scheduler, and dispatch remain disabled.
+
+**Next gate:** establish an approved server-to-server transfer path to durable private storage, create a fresh export if the current signed URL has expired, stream it without exposing the URL or SQL bytes in chat, compute SHA-256 and object metadata, then import/restore only into the disposable D1 and verify schema/data invariants. Production rollout still requires separate explicit authorization.
