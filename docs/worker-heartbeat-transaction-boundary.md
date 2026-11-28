@@ -294,3 +294,19 @@ The reusable Access policy schema supports a specific-token selector `service_to
 5. Add the Provisioner credential to its dedicated runtime through a write-only secret binding, then run positive and negative auth probes. Do not reuse AMPHETAMIN identity or enable enrollment/heartbeat routes before the independent Worker JWT authority is ready.
 
 I0 remains BLOCKED. No Service Token, Access policy, Worker secret, Provisioner identity, enrollment route, or heartbeat route was created. Scheduler/dispatch remain disabled and no Worker is schedulable.
+
+
+## I0.14 — Secure one-time Provisioner secret handoff capability gate (2026-11-28)
+
+A capability audit was performed before any Service Token creation. The current session exposes Cloudflare account API operations, but no approved Symbiotyc RemoteView action or secure secret-entry surface. The connected Browser integration is read-only (tab listing/context retrieval); it cannot fill a protected credential form. Desktop Commander is explicitly outside the approved access path for this project and was not used.
+
+Consequently, this session cannot create a Cloudflare Service Token and safely deliver its one-time `client_secret` directly into an approved secret manager or target configuration without exposing the secret to the chat/tool transcript. No token-creation API call was made; no secret value was requested, returned, copied, or stored. The account's Service Token inventory remains as last independently read in I0.13 (empty); this operation did not perform a new inventory read.
+
+### Required unblock
+
+1. Restore or expose the approved Symbiotyc RemoteView secure-entry capability, or identify another owner-approved secret manager UI that can be operated without returning the secret into chat.
+2. Confirm the destination and secret name for the Provisioner credential, with least-privilege access and audit trail.
+3. Only after the owner explicitly authorizes provisioning, create one named Service Token with a bounded lifetime (proposed 90 days / `2160h`), capture the one-time secret directly in that secure destination, and verify the destination contains it without reading the value back.
+4. Create the GROUP Service Auth Allow policy using only that token's exact ID; independently verify the policy and unauthenticated/wrong-token denial.
+
+Until this capability gate is resolved, keep GROUP Access `default-deny` (`policies: []`). Do not create a token and then expose its secret in a tool result, chat, Git, D1, CI output, or logs. Do not use Desktop Commander, AWS, shell history, or chat as a substitute. AMPHETAMIN remains untouched. Worker JWT trust remains a separate subsequent blocker; no enrollment/heartbeat route or dispatch path is enabled, and no Worker is schedulable.
