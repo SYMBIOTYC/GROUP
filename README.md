@@ -2,7 +2,7 @@
 
 **Role:** Compute Control Plane for the SYMBIOTYC Cloud federation.  
 **Protocol:** `symbiotyc.compute.v1`  
-**Status:** GROUP Worker is deployed in the primary Cloudflare production account with its dedicated EU D1 binding. AMPHETAMIN has a private Service Binding to GROUP. The public GROUP hostname and preview URLs are disabled. No compute dispatch is enabled.
+**Status:** GROUP Worker is deployed in the primary Cloudflare production account with its dedicated EU D1 binding. AMPHETAMIN has a private Service Binding to GROUP. The GROUP workers.dev hostname is enabled with Preview URLs disabled; its dedicated Access application is attached and remains default-deny with no policies. No compute dispatch is enabled.
 
 GROUP owns compute-resource coordination across `CLOUD-COMPUTE`, `CLOUD-CPU`, and `CLOUD-VPS`. It is the authority for Worker registration and eligibility, scheduling, capacity reservations, dispatch coordination, quotas, policy, lifecycle state, and audit.
 
