@@ -167,3 +167,22 @@ Focused test coverage includes a valid token and negative cases for algorithm su
 **Security boundary:** no signing key, public-key configuration, GROUP D1 resolver, Worker route, Provisioner route, Access policy, Cloudflare binding, or deployed runtime was changed. The verifier is not yet wired to a production D1 credential lookup. The private ES256 signing key remains unprovisioned. Enrollment, heartbeat, Worker eligibility, Scheduler, and dispatch remain disabled.
 
 Next gate: implement the GROUP-side durable credential resolver against production-compatible D1 semantics and inject only a public-key set into the verifier; implement signing separately behind a GROUP-only write-only private-key binding, then add key-rotation overlap and transaction-boundary tests. Do not enable routes before these gates pass.
+
+
+## I0.26.2 — D1-backed Worker credential resolver (2026-11-28)
+
+Added `src/worker-credential-resolver.mjs` with `createD1WorkerCredentialResolver({ db, now })`. It uses the Cloudflare D1 prepared-statement interface (`prepare().bind().first()`) and the existing migration 0004 tables; no schema migration was added.
+
+The lookup joins `worker_credentials` to `workers` using the server-issued Worker subject and requires an exact match on `token_jti`, `registration_epoch`, and `signing_key_id`. It additionally requires:
+- Worker state `ACTIVE` or `DEGRADED`;
+- Worker registration epoch equal to the credential epoch;
+- `revoked_at IS NULL`;
+- credential expiry later than server receive time (SQLite `julianday` comparison plus a defensive parsed-time check).
+
+The resolver rejects extra/caller-supplied identity fields. Tenant and project identifiers are returned only from the joined D1 Worker row and are not accepted as resolver inputs. Missing rows return `null`; malformed identity, invalid clock, or D1 errors fail closed. The verifier's existing resolver contract remains compatible: the resolver returns `active`, Worker/JTI/epoch/key ID, and server-derived tenant/project context.
+
+**Verification:** `node --test tests/worker-credential-resolver.test.mjs` was run in an isolated local working copy on Node 22.16.0: 8 passed, 0 failed. Tests cover the D1 binding contract, bound lookup parameters, required SQL predicates, tenant/project derivation, unknown credentials, revoked/expired/ineligible rows, identity mismatches, caller-supplied tenant rejection, and D1 failure. This is a focused adapter-contract test with a D1-shaped fake, not a live Cloudflare D1 integration test, production D1 migration proof, or full repository suite.
+
+**Security boundary:** the resolver is not wired into `verifyWorkerJwt()`, any HTTP route, Provisioner, or deployed Worker. No D1 migration was applied, no Cloudflare binding/configuration or secret changed, and no key material was provisioned. Migration 0004's `worker_credentials` table is present in source; production D1 schema state has not been revalidated in this step. Enrollment/heartbeat, Worker eligibility, Scheduler, and dispatch remain disabled.
+
+Next gate: add a production-compatible D1 integration test against the actual deployed D1 schema (including credential issuance/revocation lifecycle), then compose this resolver with the ES256 verifier behind a non-routed internal service boundary. Do not expose a heartbeat route or enable scheduling until D1 behavior, signing-key lifecycle, and transaction rollback gates pass.
