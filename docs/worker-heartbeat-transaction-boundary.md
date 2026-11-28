@@ -112,3 +112,16 @@ Consequences:
 - Until then, the Access application domain and Worker route target are unresolved. No Cloudflare resources were changed.
 
 This is an additional I0 prerequisite, not a reason to expose the current GROUP Worker publicly.
+
+
+## I0.4 — Free enrollment hostname selected
+
+The Cloudflare Primary account already has the Workers subdomain `vladyslavchaplygin.workers.dev` (confirmed by the account's Workers Subdomain GET endpoint). Cloudflare's Workers Access documentation explicitly supports hostname-based Access protection for a `workers.dev` hostname by creating a self-hosted Access application.
+
+Candidate enrollment origin:
+
+`https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`
+
+This is a candidate, not yet a verified live URL: the current Worker inventory/settings response does not expose an authoritative `workers_dev` enablement flag, so reachability must be probed before creating Access policy or publishing enrollment routes. The exact host is reserved for the GROUP control plane; do not reuse the AMPHETAMIN hostname.
+
+No Worker settings, Access applications, policies, or tokens were changed in this step. The account's Workers subdomain already exists, so no new domain or DNS zone is required. The remaining privileged step is Access application + default-deny/Service Auth policy provisioning, followed by a one-time Service Token secret handoff into the future dedicated Provisioner Worker through an approved secure secret-entry path. Do not create a token until that secret handoff path exists.
