@@ -579,7 +579,19 @@ Corrected the three source-level blockers identified in I0.26.5:
 
 Regression tests cover revoked Worker heartbeat rejection with unchanged snapshot and no heartbeat row, replacement after challenge expiry, continued blocking by an unexpired challenge, immutable ledger claims, and valid/invalid state transitions. Test SQL fixtures were aligned with the new `superseded_at` column.
 
-**Verification status:** source and tests have been committed. CI and disposable D1-compatible execution must pass before this review can be considered cleared. No production D1 migration was applied, no Cloudflare resource or secret changed, and no enrollment/heartbeat route or Scheduler/dispatch capability was enabled. The production migration decision remains HOLD pending CI, exact migration checksums, disposable database acceptance, backup/restore readiness, and separate production authorization.
+**Verification:** GitHub Actions on commit `495dde350a2b16ace442f4d293053550df03f178` passed:
+- Runtime unit tests: run #285 / ID `46156096251`, 94 passed, 0 failed.
+- Worker Registry migration/resolver SQLite tests: 22 passed.
+- Credential resolver SQLite tests: 8 passed.
+- Compute protocol contracts/schema conformance: run #291 / ID `46156096272`, passed.
+
+Reviewed migration content SHAs:
+- `0004_worker_registry.sql`: `561a6f27035a3b9398f561d8aaaa863e648c2137`
+- `0005_worker_heartbeat_fencing.sql`: `61e8c79f8ab6f847808c99003647dab81d371adf`
+- `0006_worker_provisioning_requests.sql`: `cebee8d68b73f270e3194ea964a4948750a8e263`
+- Regression tests: `tests/test_worker_registry_migration.py` SHA `513e0a4076d149b959221a4ee22e64e4e22dda41`
+
+This clears the source-level B1–B3 and CI gates only. It does not constitute a disposable D1-compatible acceptance run or production rollout approval. No production D1 migration was applied, no Cloudflare resource or secret changed, and no enrollment/heartbeat route or Scheduler/dispatch capability was enabled. Production decision remains **HOLD** pending disposable D1-compatible acceptance, verified backup/restore readiness, exact live preflight, and separate explicit authorization.
 
 
 ### I0.26.7 verification addendum
