@@ -468,3 +468,14 @@ The verifier requires compact ES256 JWTs, exact JOSE header and claim allowlists
 **Remaining security gates:** the resolver is not yet connected to D1; public verification keys are not configured; the private ES256 signing key is not provisioned; issuer/signing code and rotation lifecycle are not implemented. No route, secret, binding, Access policy, Cloudflare resource, or deployment changed. Enrollment/heartbeat, Worker eligibility, Scheduler and dispatch remain disabled.
 
 Next: implement and test the D1-backed credential resolver and key-set loading contract, followed by a separate GROUP-only signing primitive and key rotation tests. Do not enable routes until durable revocation/epoch checks and production-compatible D1 behavior are verified.
+
+
+## I0.26.2 — D1-backed Worker credential resolver (2026-11-28)
+
+GROUP now contains `src/worker-credential-resolver.mjs`, a D1 adapter for the durable credential resolver required by `verifyWorkerJwt()`. It joins `worker_credentials` and `workers` by Worker ID and enforces exact subject/JTI/registration-epoch/signing-key-ID matching, current Worker epoch, eligible `ACTIVE`/`DEGRADED` state, non-revoked credential status, and unexpired credential metadata. Expiry is checked against the resolver's server-side clock. Tenant/project context is selected from the joined Worker row; caller-supplied tenant/project fields are rejected.
+
+**Focused test evidence:** `node --test tests/worker-credential-resolver.test.mjs` — 8 passed, 0 failed on Node 22.16.0 in an isolated local working copy. The tests use a D1-shaped fake to verify prepared/bound lookup semantics and fail-closed handling. They are not a live D1 integration test and do not prove migration 0004 is applied to production D1.
+
+**Boundary:** the resolver is not yet passed into `verifyWorkerJwt()` at a runtime call site. No route, migration, binding, secret, Access policy, deployment, or Cloudflare resource changed. No Worker can be enrolled or scheduled as a result of this isolated module. I0.20 secure credential-provisioning block remains in force; enrollment/heartbeat and Scheduler/dispatch remain disabled.
+
+Next: verify the exact resolver query against a production-compatible D1 database and the deployed schema, then compose resolver + verifier behind a private non-routed boundary. Signing, key rotation, transaction rollback/failure-injection, and route authorization remain separate gates.
