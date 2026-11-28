@@ -12,21 +12,53 @@ permissions:
 jobs:
   runtime-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Run runtime unit tests
+      - name: Install wasm32 compiler and linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+      - name: Compile the C policy as a freestanding wasm32 module
+        run: |
+          mkdir -p build
+          clang --target=wasm32 -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -nostdlib -Isrc src/amphetamin_policy.c src/amphetamin_wasm.c \
+            -Wl,--no-entry -Wl,--export-memory \
+            -Wl,--export=amphetamin_abi_version \
+            -Wl,--export=amphetamin_input_ptr \
+            -Wl,--export=amphetamin_output_ptr \
+            -Wl,--export=amphetamin_eval \
+            -Wl,--initial-memory=131072 -Wl,--max-memory=131072 \
+            -o build/amphetamin_policy.wasm
+      - name: Compile native C reference evaluator for parity tests
+        run: cc -std=c11 -Wall -Wextra -Werror -pedantic -Isrc src/amphetamin_policy.c tests/amphetamin_native_reference.c -o /tmp/amphetamin-native-reference
+      - name: Run runtime, controller, WASM adapter, parity, and Worker route tests
+        env:
+          AMPHETAMIN_WASM_PATH: build/amphetamin_policy.wasm
+          AMPHETAMIN_NATIVE_EVALUATOR: /tmp/amphetamin-native-reference
         run: node --test tests/*.test.mjs
+      - name: Compile and run AMPHETAMIN C policy tests
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pedantic -Isrc src/amphetamin_policy.c tests/amphetamin_policy_test.c -o /tmp/amphetamin-policy-test
+          /tmp/amphetamin-policy-test
+      - name: Verify low-level wasm32 ABI round-trip
+        env:
+          AMPHETAMIN_WASM_PATH: build/amphetamin_policy.wasm
+        run: node --test wasm-tests/amphetamin-wasm-abi.test.mjs
+      - name: Verify Wrangler Worker bundle with the compiled WASM module
+        run: npx --yes wrangler@latest deploy --dry-run --outdir=dist
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run Worker Registry migration and resolver tests
+      - name: Run Worker Registry, AMPHETAMIN migration, and resolver tests
         run: |
           python tests/test_worker_registry_migration.py
           python tests/test_worker_credential_resolver_sqlite.py
+          python tests/test_amphetamin_migration.py
       - name: Apply all migrations to disposable local D1 and assert security triggers
         env:
           WRANGLER_SEND_METRICS: "false"
