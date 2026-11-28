@@ -41,6 +41,7 @@ CREATE TRIGGER IF NOT EXISTS amphetamin_activation_events_apply_once
 BEFORE UPDATE ON amphetamin_activation_events
 WHEN OLD.applied_at IS NOT NULL
   OR NEW.applied_at IS NULL
+  OR changes() != 1
 BEGIN
   SELECT RAISE(ABORT, 'AMPHETAMIN activation event can be applied only once');
 END;
