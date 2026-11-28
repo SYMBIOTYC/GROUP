@@ -114,3 +114,8 @@ All mutating endpoints require idempotency or version preconditions and an appen
 ## 2.2 Durable Worker Registry storage foundation
 
 Migration `0004_worker_registry.sql` adds durable Worker identity, policy-granted capabilities, hashed one-time enrollment challenges, credential identifiers/hashes, append-only heartbeat observations, lease indexes, and tenant/project-bound append-only Worker audit. Its presence is a storage foundation only: the migration has not been applied to production D1 by this commit, no registration/heartbeat routes are exposed, and no Worker is thereby enrolled or schedulable. Regression coverage is in `tests/test_worker_registry_migration.py`.
+
+
+## 2.3 Database-enforced heartbeat fencing
+
+Migration `0005_worker_heartbeat_fencing.sql` adds a `BEFORE INSERT` guard requiring the Worker to be `ACTIVE` or `DEGRADED`, the supplied `registration_epoch` to match the current registration, the heartbeat sequence to equal the stored sequence plus one, and observed concurrency/CPU/memory not to exceed the registered capacity. An `AFTER INSERT` trigger advances the Worker heartbeat sequence, health state, server-received timestamp, lease expiry, record version, and update timestamp in the same database statement. A failed snapshot update aborts the insert. This protects the storage boundary against stale epochs, sequence gaps/replays, inactive Workers, and over-reported capacity. The caller must still wrap heartbeat insertion, audit and outbox writes in one D1 transaction; this migration does not provide an HTTP endpoint or authentication.
