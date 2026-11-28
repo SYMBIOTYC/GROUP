@@ -2,7 +2,7 @@
 
 **Role:** Compute Control Plane for the SYMBIOTYC Cloud federation.  
 **Protocol:** `symbiotyc.compute.v1`  
-**Status:** GROUP Worker is deployed in the primary Cloudflare production account with its dedicated EU D1 binding. AMPHETAMIN has a private Service Binding to GROUP. The GROUP workers.dev hostname is enabled with Preview URLs disabled; its dedicated Access application is attached and remains default-deny with no policies. No compute dispatch is enabled.
+**Status:** GROUP Worker is deployed in the primary Cloudflare production account with its dedicated EU D1 binding. AMPHETAMIN has a private Service Binding to GROUP. The GROUP workers.dev hostname and Preview URLs are disabled; its dedicated Access application remains default-deny with no policies. No compute dispatch is enabled.
 
 GROUP owns compute-resource coordination across `CLOUD-COMPUTE`, `CLOUD-CPU`, and `CLOUD-VPS`. It is the authority for Worker registration and eligibility, scheduling, capacity reservations, dispatch coordination, quotas, policy, lifecycle state, and audit.
 
@@ -42,6 +42,7 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - [AMPHETAMIN MCP contract](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-MCP.md)
 - [Compute Control Plane](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Compute-Control-Plane.md)
 - [Worker Registry](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Worker-Registry.md)
+- [AMPHETAMIN quality-weighted randomized Worker scaling](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/AMPHETAMIN-Quality-Weighted-Random-Worker-Scaling.md)
 - [Execution Lifecycle](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Execution-Lifecycle.md)
 - [Live deployment verification (2026-11-28)](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md)
 
@@ -90,7 +91,7 @@ PR #10 adds the private approval API and the D1 migration `0003_compute_approval
 - Cancel approvals require an existing non-terminal Job in the same tenant/project.
 - Approval claims are immutable; approvals cannot be deleted; audit events are append-only.
 
-**Production state (2026-11-28):** The D1 migration has been applied and recorded in `d1_migrations` alongside the existing 0001 and 0002 baseline. The table, index, and three triggers are present. The GROUP Worker source contains the new routes on `main`, but the live Worker has not yet been upgraded; the Cloudflare upload was blocked by the security layer. These endpoints are therefore not yet active in production. GROUP's repository target config sets `workers_dev=false` and `preview_urls=false`; live Cloudflare state is separate: the `workers.dev` subdomain is enabled with Preview URLs disabled and the dedicated Access app remains default-deny (`policies=[]`).
+**Production state (2026-11-28):** The D1 migration has been applied and recorded in `d1_migrations` alongside the existing 0001 and 0002 baseline. The table, index, and three triggers are present. The GROUP Worker source contains the new routes on `main`, but the live Worker has not yet been upgraded; the Cloudflare upload was blocked by the security layer. These endpoints are therefore not yet active in production. GROUP's repository target config sets `workers_dev=false` and `preview_urls=false`; live Cloudflare state was read back on 2026-11-28: the `workers.dev` subdomain and Preview URLs are disabled; the dedicated Access app remains default-deny (`policies=[]`).
 
 - `migrations/0006_worker_provisioning_requests.sql` — durable Provisioner-subject-scoped idempotency ledger; schema only, not applied to production D1.
 - `provisioner/` — isolated, quarantined Provisioner Worker scaffold; deployment manifest declares a private GROUP Service Binding, but Access verification, GROUP authorization, and deployment are not implemented.
@@ -135,7 +136,7 @@ I0.26.8 production D1 read-only preflight: target DB is confirmed, but productio
 
 ## I0.26.9 — disposable local D1 migration acceptance
 
-CI now applies migrations 0001–0006 through Wrangler v4 against an isolated local D1 database and asserts six migration ledger rows, all nine critical Worker Registry security triggers, and zero FK violations. Run #298 passed (94/94 runtime tests, 22 migration tests, 8 resolver tests, local D1 acceptance); schema conformance run #305 passed. Production D1 remains unchanged and rollout HOLD pending independent backup/restore rehearsal and explicit authorization.
+Mainline CI run #298 validated migrations 0001–0006 against an isolated local D1 database (94/94 runtime tests, 22 Worker Registry migration tests, 8 resolver tests); schema conformance run #305 passed. The AMPHETAMIN integration extends this gate through migration 0007 and asserts seven migration ledger rows, twelve security triggers, both AMPHETAMIN activation tables, and zero foreign-key violations. Production D1 remains unchanged; rollout remains HOLD pending backup/restore readiness and explicit authorization.
 
 ## I0.26.10 — production backup/restore readiness audit
 
@@ -156,3 +157,16 @@ I0.26.13 (2026-11-28): Dropbox was approved as an independent-backup alternative
 
 
 I0.26.14 (2026-11-28): Next backup blocker is the missing isolated Cloudflare→Dropbox relay and dedicated Dropbox OAuth credential. Dropbox upload sessions require files.content.write; D1 export URL is temporary (one hour) and export can block source queries. The connected Dropbox MCP token is not exportable and must not be reused. Proposed separate relay Worker must stream bounded chunks, keep URL/token/SQL out of chat and logs, and verify SHA-256. No app/token/secret/Worker or production export created. See [heartbeat backup gate](docs/worker-heartbeat-transaction-boundary.md#i02614--dropbox-server-side-backup-relay-trust-boundary-2026-11-28).
+
+
+## AMPHETAMIN policy runtime — integration candidate
+
+The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssembly ABI v1 evaluator are carried on a fresh integration branch based on the latest GROUP mainline. The WASM Worker entrypoint is `src/worker.mjs`; it delegates existing routes to `src/index.mjs` and lazily instantiates the policy module for `POST /v1/activation/evaluate`.
+
+- Activation-state migration: `migrations/0007_amphetamin_activation_state.sql`, following current mainline migrations 0001–0006. Not applied to production.
+- Native C/WASM parity: 14 fixed vectors plus 5,000 seeded valid inputs.
+- Exact-head CI passed on `b12c9c6c`: runtime #335 (`126/126` Node, `13` C policy, `3` WASM ABI, `22` Worker Registry migration, `8` credential resolver, `6` AMPHETAMIN migration tests; local D1 0001–0007 acceptance), schema #342, and WASM ABI #30.
+- External activation producers may submit deployment events only; tick events are rejected at the HTTP boundary and reserved for the internal GROUP controller.
+- Activation state update and event application require paired D1 batch results; a migration trigger aborts event application unless the preceding state CAS changed exactly one row.
+- The principal assertion is an unsigned internal assertion trusted only over the private AMPHETAMIN Service Binding. A read-only Cloudflare control-plane audit on 2026-11-28 confirmed GROUP workers.dev and Preview URLs disabled, no Worker Domains or zone routes for GROUP, and AMPHETAMIN as the only script with a Service Binding to GROUP. The Access application remains default-deny with no policies. This verifies the service-binding-only ingress topology at the control-plane level; an external HTTP response was not independently observed. Keep the candidate Draft pending final review.
+- Evaluation is policy-decision only. Dispatch, provisioning, and production rollout remain disabled.
