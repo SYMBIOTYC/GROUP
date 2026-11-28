@@ -132,8 +132,8 @@ async function activationStateRoute(request, env, principal, correlation, eventI
     if (!body || typeof body !== "object" || Array.isArray(body) ||
         Object.keys(body).some((key) => !["event_id", "event_type"].includes(key)) ||
         typeof body.event_id !== "string" ||
-        !["deployment", "tick"].includes(body.event_type)) {
-      return errorResponse(422, "INVALID_ACTIVATION_EVENT", "event_id and event_type (deployment or tick) are required; timestamps are assigned by GROUP.", correlation);
+        body.event_type !== "deployment") {
+      return errorResponse(422, "INVALID_ACTIVATION_EVENT", "Only deployment events are accepted through the service API; periodic tick events are emitted by the GROUP scheduled controller.", correlation);
     }
     const dbError = databaseUnavailable(env, correlation);
     if (dbError) return dbError;
