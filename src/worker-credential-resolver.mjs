@@ -8,7 +8,8 @@ const LOOKUP_SQL = `
     c.token_jti,
     c.signing_key_id,
     c.expires_at AS credential_expires_at,
-    c.revoked_at
+    c.revoked_at,
+    w.revoked_at AS worker_revoked_at
   FROM worker_credentials AS c
   INNER JOIN workers AS w ON w.worker_id = c.worker_id
   WHERE w.worker_id = ?
@@ -18,6 +19,7 @@ const LOOKUP_SQL = `
     AND c.revoked_at IS NULL
     AND julianday(c.expires_at) > julianday(?)
     AND w.registration_epoch = c.registration_epoch
+    AND w.revoked_at IS NULL
     AND w.state IN ('ACTIVE', 'DEGRADED')
   LIMIT 1
 `;
@@ -76,6 +78,7 @@ export function createD1WorkerCredentialResolver({ db, now = () => new Date() } 
         row.registration_epoch !== identity.registrationEpoch ||
         row.signing_key_id !== identity.keyId ||
         row.revoked_at !== null ||
+        row.worker_revoked_at !== null ||
         typeof row.tenant_id !== "string" || !row.tenant_id ||
         typeof row.project_id !== "string" || !row.project_id) {
       return null;
