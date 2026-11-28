@@ -72,7 +72,10 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
     if (in->max_credits == 0u ||
         (uint64_t)in->available_credits * 100u <=
         (uint64_t)in->max_credits * REFILL_THRESHOLD_PERCENT) {
-        return decision((in->resource_pressure >= RESOURCE_HUNT_THRESHOLD || in->overload_score >= RESOURCE_HUNT_THRESHOLD) ? AMPHETAMIN_RESOURCE_HUNT : AMPHETAMIN_REFILL, 0u, 1u, (in->resource_pressure >= RESOURCE_HUNT_THRESHOLD || in->overload_score >= RESOURCE_HUNT_THRESHOLD) ? 1u : 0u, 4u);
+        uint8_t hunt = (uint8_t)(in->resource_pressure >= RESOURCE_HUNT_THRESHOLD ||
+                                 in->overload_score >= RESOURCE_HUNT_THRESHOLD);
+        return decision(hunt ? AMPHETAMIN_RESOURCE_HUNT : AMPHETAMIN_REFILL,
+                        0u, 1u, hunt, 4u);
     }
 
     if (in->max_workers == 0u || in->available_credits == 0u) {
