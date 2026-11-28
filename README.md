@@ -140,3 +140,8 @@ CI now applies migrations 0001–0006 through Wrangler v4 against an isolated lo
 ## I0.26.10 — production backup/restore readiness audit
 
 Read-only checks confirm the production D1 Time Travel bookmark endpoint is available, but no independent export or restore rehearsal exists. The export API may make D1 unavailable to queries while the export runs. No export or restore was executed. Production rollout remains HOLD pending owner approval for full export, independent storage, and a separate disposable restore drill.
+
+
+### I0.26.11 — production D1 backup/restore gate
+
+The I0.26.11 read-only audit confirms Time Travel support but no independently retrievable backup. Cloudflare reports R2 is not enabled for the account context. A full D1 export can block database requests; export, independent storage provisioning, and a remote disposable-D1 restore rehearsal are held for explicit owner approval. Production migrations 0004–0006 remain unapplied. See [worker heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i02611--external-backup-destination-and-restore-rehearsal-gate-2026-11-28) and [Provisioner runtime contract](docs/provisioner-runtime-contract.md#i02611--external-backup-destination-and-restore-rehearsal-gate-2026-11-28).
