@@ -214,7 +214,7 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
                 """INSERT INTO worker_provisioning_requests
                    (provisioning_request_id, provisioner_subject, idempotency_key_hash,
                     request_digest, worker_id, state, correlation_id, created_at, updated_at, completed_at, expires_at)
-                   VALUES ('request-1', 'provisioner:a', ?, ?, 'missing-worker', 'COMPLETED', 'corr-1', 'now', 'now', 'now', 'later')""",
+                   VALUES ('request-1', 'provisioner:a', ?, ?, 'missing-worker', 'PENDING', 'corr-1', 'now', 'now', NULL, 'later')""",
                 ("a" * 64, "b" * 64),
             )
 
