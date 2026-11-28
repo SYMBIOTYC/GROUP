@@ -98,3 +98,10 @@ Cloudflare Primary read-only inventory confirms an existing Secrets Store `defau
 The proposed secret scope is `workers`, for a future dedicated Provisioner Worker. No Provisioner Worker or binding currently exists; binding and runtime verification remain a separate deployment step. No token, secret, policy, identity provider, or Worker configuration was created or changed in this audit. GROUP remains default-deny; AMPHETAMIN is unchanged. Machine-to-machine Provisioner auth does not require a human Identity Provider.
 
 Provisioning still requires explicit owner authorization. After approval, create one bounded-lifetime token (90 days / `2160h`), persist its secret write-only, verify metadata only, and add an Access Service Auth Allow policy matching only the returned token ID. Never emit the Client Secret in tool output, chat, logs, Git, D1, or CI.
+
+ 
+## I0.20 — Provisioner token creation blocked (2026-11-28)
+
+The owner authorized a 90-day Provisioner Service Token and write-only storage of its one-time Client Secret in Cloudflare Secrets Store. The attempted combined server-side write was blocked by the execution safety layer before the Cloudflare writes ran. A subsequent independent read-only check confirmed zero account Service Tokens, no token named `SYMBIOTYC GROUP Provisioner 90d`, zero Secrets Store secrets, and no secret named `SYMBIOTYC_GROUP_PROVISIONER_ACCESS_CLIENT_SECRET`.
+
+No credential was generated or stored; no Access policy, Worker binding, or route changed. GROUP remains default-deny, AMPHETAMIN unchanged, and enrollment/heartbeat/dispatch disabled. This was a tool-execution safety block, not a Cloudflare API rejection. Do not retry via another tool to bypass the gate. Resume only through an explicitly supported secure credential-provisioning workflow.
