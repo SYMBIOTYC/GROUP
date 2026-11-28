@@ -380,3 +380,19 @@ A subsequent independent read-only Cloudflare API read-back confirmed:
 Therefore no token was created, no Client Secret was generated or exposed, and no secret was stored. No Access policy, Worker binding, or application route changed. GROUP remains default-deny; AMPHETAMIN remains untouched; enrollment/heartbeat and Scheduler/dispatch remain disabled.
 
 This is an execution-policy block, not a Cloudflare API rejection. Do not retry the same credential-creation call through a different tool or route to evade the safety gate. The next step is to use an explicitly supported Cloudflare/ChatGPT secure credential-provisioning workflow or obtain an approved execution path; then repeat the owner-authorized operation with secret values kept out of tool output and logs.
+
+
+## I0.21 — Provisioner runtime boundary audit (2026-11-28)
+
+A read-only source/configuration audit was completed after I0.20:
+
+- GROUP's current `src/index.mjs` route table exposes health, capabilities, approvals, and Job endpoints only. It has no Provisioner enrollment route, Worker registration/heartbeat route, Worker JWT issuer, or credential-verification middleware.
+- GROUP's `wrangler.jsonc` declares only the D1 `DB` binding. It has no Provisioner service binding, Secrets Store binding, Worker signing-key binding, or JWT verification configuration.
+- The inspected deployed Worker inventory previously confirmed no separately deployed Provisioner Worker. No repository deployment manifest for a Provisioner runtime was found in the audited GROUP paths.
+- The existing AMPHETAMIN principal assertion remains valid only at the private Job API Service Binding boundary; it is not a Provisioner identity and cannot authorize Worker enrollment.
+
+**Next implementation blocker:** there is no isolated Provisioner runtime or deployment contract. Before writing enrollment code, define and review a separate Provisioner Worker (or an explicitly isolated service) with: its own entrypoint and deployment manifest; narrowly scoped Access Service Auth ingress; write-only secret binding to the approved Secrets Store secret; least-privilege GROUP control-plane binding; fixed issuer/audience and asymmetric Worker credential signing contract; rotation/revocation ownership; and negative tests proving AMPHETAMIN credentials cannot cross into enrollment authority.
+
+This design work can proceed without generating credentials. Actual Access token creation/secret storage remains blocked by I0.20 and must not be retried through another tool or route. Do not add routes or bindings to the live GROUP Worker as a workaround. Keep GROUP Access default-deny, AMPHETAMIN unchanged, and enrollment/heartbeat/Scheduler/dispatch disabled.
+
+Evidence: `src/index.mjs` (route table), `wrangler.jsonc` (only D1 DB binding), and the read-only deployed Worker inventory. No Cloudflare resources or application code were changed in this audit.
