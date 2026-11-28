@@ -136,3 +136,7 @@ I0.26.8 production D1 read-only preflight: target DB is confirmed, but productio
 ## I0.26.9 — disposable local D1 migration acceptance
 
 CI now applies migrations 0001–0006 through Wrangler v4 against an isolated local D1 database and asserts six migration ledger rows, all nine critical Worker Registry security triggers, and zero FK violations. Run #298 passed (94/94 runtime tests, 22 migration tests, 8 resolver tests, local D1 acceptance); schema conformance run #305 passed. Production D1 remains unchanged and rollout HOLD pending independent backup/restore rehearsal and explicit authorization.
+
+## I0.26.10 — production backup/restore readiness audit
+
+Read-only checks confirm the production D1 Time Travel bookmark endpoint is available, but no independent export or restore rehearsal exists. The export API may make D1 unavailable to queries while the export runs. No export or restore was executed. Production rollout remains HOLD pending owner approval for full export, independent storage, and a separate disposable restore drill.
