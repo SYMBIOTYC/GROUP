@@ -82,3 +82,10 @@ Before treating GROUP as private/internal in production:
 6. Prefer restoring `workers_dev=false` once the approved internal Service Binding path is validated and public hostname access is no longer required.
 
 Cloudflare Access is now configured for GROUP, contrary to the older statement in this document; enforcement at the external request layer is still unverified. External AMPHETAMIN authentication remains a separate prerequisite.
+
+
+## I0.18 — Runtime Access probe (2026-11-28)
+
+Cloudflare Browser Rendering was used for a server-side request to the GROUP hostname. The hostname returned HTTP 302 into the configured Cloudflare Access login path, proving request interception. The rendered Access page returned HTTP 400 with: `There are no login methods available for this account. An admin must create an identity provider in the Cloudflare One dashboard.` A read-only `GET /accounts/{account_id}/access/identity_providers` returned `total_count: 0`; the GROUP Access application still has `policies=[]`.
+
+Interpretation: Access intercepts the hostname, but no Identity Provider or usable human login method is configured. The HTTP 400 is the Access login configuration error, not a GROUP origin response and not a clean 403 denial test. The prior external request-path uncertainty is closed; the next blocker is choosing and explicitly authorizing a human IdP + narrowly scoped policy or the separate Provisioner Service Token + exact-token Service Auth policy. The latter still requires approved secure one-time secret capture. No Cloudflare configuration or application code changed; AMPHETAMIN remains untouched and enrollment/heartbeat/dispatch remain disabled.
