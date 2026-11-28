@@ -17,6 +17,8 @@ typedef struct {
     uint8_t resource_pressure; /* 0..100: token/API/CPU/memory pressure */
     uint8_t overload_score;    /* 0..100: burn/overdose risk */
     uint8_t quality_score;     /* 0..100: release quality */
+    uint8_t cooldown_latched;  /* 1 while an external controller holds cooldown */
+    uint8_t recovery_score;    /* 0..100: telemetry-backed recovery confidence */
     uint32_t available_credits;
     uint32_t max_credits;
     uint32_t max_workers;
