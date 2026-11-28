@@ -153,3 +153,6 @@ Owner approval received for production export, R2 independent storage, and a dis
 
 
 I0.26.13 (2026-11-28): Dropbox was approved as an independent-backup alternative, but the connected integration supports only conversation-file upload and has no server-side URL/binary streaming path for a Cloudflare D1 export. No production export or Dropbox write occurred; disposable restore D1 remains empty and migrations 0004–0006 remain HOLD. A secure server-to-server transfer capability is required before export. Details: [heartbeat transaction and backup gate](docs/worker-heartbeat-transaction-boundary.md#i02613--dropbox-independent-backup-fallback-capability-check-2026-11-28).
+
+
+I0.26.14 (2026-11-28): Next backup blocker is the missing isolated Cloudflare→Dropbox relay and dedicated Dropbox OAuth credential. Dropbox upload sessions require files.content.write; D1 export URL is temporary (one hour) and export can block source queries. The connected Dropbox MCP token is not exportable and must not be reused. Proposed separate relay Worker must stream bounded chunks, keep URL/token/SQL out of chat and logs, and verify SHA-256. No app/token/secret/Worker or production export created. See [heartbeat backup gate](docs/worker-heartbeat-transaction-boundary.md#i02614--dropbox-server-side-backup-relay-trust-boundary-2026-11-28).
