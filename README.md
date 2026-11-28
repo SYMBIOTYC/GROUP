@@ -101,3 +101,8 @@ PR #10 adds the private approval API and the D1 migration `0003_compute_approval
 - `src/provisioner-auth.mjs` and `tests/provisioner-auth.test.mjs` — isolated ES256 Provisioner assertion verifier and focused negative tests; verifier is not wired to an enrollment route and trust keys are not configured.
 - `provisioner/src/provisioner-assertion.mjs` and `tests/provisioner-assertion.test.mjs` — request-bound ES256 Provisioner assertion signer and GROUP-verifier interoperability tests; no runtime key or binding configured.
 - `src/provisioner-request-binding.mjs` and `tests/provisioner-request-binding.test.mjs` — GROUP-side canonical request binding computed from the received HTTP request; the verifier recomputes `rqh`/`ikh` and ignores caller-supplied digest headers. Still not wired to an enrollment route.
+
+
+## I0.26.4 — production D1 schema inventory
+
+The deployed GROUP Worker `DB` binding was resolved read-only to production database `symbiotyc-group-compute-state`. Its migration ledger contains only 0001–0003. Worker Registry tables and heartbeat-fencing triggers are absent; migrations 0004–0006 are not applied. The I0.26.2/3 credential resolver therefore cannot run against the currently bound production D1. No D1 changes were made. See [runtime contract](docs/provisioner-runtime-contract.md#i0264--read-only-production-d1-schema-inventory-2026-11-28) and [F2.3 transaction gate](docs/worker-heartbeat-transaction-boundary.md#i0264--read-only-production-d1-schema-inventory-2026-11-28).
