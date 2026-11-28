@@ -279,7 +279,8 @@ test("Tenant A cannot read Tenant B Job by its known UUID", async () => {
           };
         }
       };
-    }
+    },
+    async batch() { return []; }
   };
 
   const response = await worker.fetch(new Request(`https://group.test/v1/jobs/${tenantBJob.job_id}`, {
@@ -303,7 +304,7 @@ test("Tenant A cannot cancel Tenant B Job or create audit/outbox side effects", 
             sql,
             values,
             first: async () => {
-              assert.match(sql, /WHERE job_id = \\? AND tenant_id = \\? AND project_id = \\?/);
+              assert.match(sql, /WHERE job_id = \? AND tenant_id = \? AND project_id = \?/);
               assert.deepEqual(values, [tenantBJob.job_id, "tenant-a", "project-a"]);
               return null;
             }
