@@ -337,3 +337,16 @@ Fresh Cloudflare control-plane read-back confirmed the GROUP workers.dev subdoma
 No Cloudflare configuration or application resources changed. No Access policy, Service Token, Worker secret, route, enrollment/heartbeat endpoint, or dispatch path was created or enabled. AMPHETAMIN remains untouched; no Worker is schedulable and Scheduler/dispatch remain disabled.
 
 Next technical gate: obtain independent request-path evidence using a supported external probe or Cloudflare edge-side diagnostic that is not subject to this connector's egress restrictions, then correlate the request with Access and Worker telemetry. Do not ask the owner to use a browser; do not treat connector-generated 403 as origin behavior.
+
+
+## I0.18 — Browser-rendered external Access enforcement and missing IdP (2026-11-28)
+
+The owner has no usable browser on their phone and must not be asked to open URLs. A server-side probe was completed through Cloudflare Browser Rendering API `POST /accounts/{account_id}/browser-rendering/content` against the GROUP workers.dev hostname. The initial request to the hostname returned HTTP 302 with a `Location` redirect into the Cloudflare Access login path on the account's `cloudflareaccess.com` domain. This is direct request-path evidence that Cloudflare Access intercepts the hostname before the GROUP Worker is reached.
+
+The final rendered page returned HTTP 400 and title `Error · Cloudflare Access`; its visible message was: `There are no login methods available for this account. An admin must create an identity provider in the Cloudflare One dashboard.` A separate read-only Cloudflare API call to `GET /accounts/{account_id}/access/identity_providers` returned `total_count: 0`. The dedicated GROUP Access application still has no policies (`policies=[]`) and the account has no configured identity providers. Therefore the observed behavior is Access interception followed by an unusable login flow due to missing IdP, not a clean, independently verified 403 denial page. Do not claim the GROUP Worker is reachable or that an authorized identity can authenticate.
+
+This closes the prior uncertainty about whether requests to the public hostname are intercepted by Access. It opens a distinct configuration blocker: choose and explicitly authorize an authentication method. For human login, an account-level Identity Provider must be configured and then narrowly allowed by a policy; for Provisioner machine-to-machine access, continue the dedicated Service Token path with exact-token Service Auth policy and secure one-time secret capture. Do not create an IdP, policy, or token without explicit owner authorization and the approved secure credential workflow. The Service Token is not a Worker Agent JWT/signing key.
+
+No Cloudflare resources or application code were changed during this probe. No credentials, cookies, or one-time secrets were supplied. No Worker enrollment/heartbeat endpoint, Worker eligibility, or Scheduler/dispatch was enabled; AMPHETAMIN remains untouched.
+
+Next gate: resolve the identity-provider / Provisioner-auth choice and secure secret handoff. Keep the Access application fail-closed until a supported authentication path is configured and negative/positive access tests are complete.
