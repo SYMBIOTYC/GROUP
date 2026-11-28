@@ -30,6 +30,7 @@ const telemetry = {
   max_workers: 4
 };
 const db = {
+  batch: async () => [],
   prepare() {
     return { bind() { return { first: async () => null }; } };
   }
