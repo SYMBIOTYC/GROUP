@@ -25,7 +25,7 @@ jobs:
           node-version: "22"
       - name: Apply all migrations to isolated local D1
         run: |
-          npx --yes wrangler@4 d1 migrations apply DB --local --yes \
+          npx --yes wrangler@4 d1 migrations apply DB --local --force \
             --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test
       - name: Seed isolated D1 fixtures
         run: |
