@@ -350,3 +350,18 @@ This closes the prior uncertainty about whether requests to the public hostname 
 No Cloudflare resources or application code were changed during this probe. No credentials, cookies, or one-time secrets were supplied. No Worker enrollment/heartbeat endpoint, Worker eligibility, or Scheduler/dispatch was enabled; AMPHETAMIN remains untouched.
 
 Next gate: resolve the identity-provider / Provisioner-auth choice and secure secret handoff. Keep the Access application fail-closed until a supported authentication path is configured and negative/positive access tests are complete.
+
+
+## I0.19 — Cloudflare Secrets Store secure-handoff path verified (2026-11-28)
+
+A read-only audit of the Cloudflare Primary account and the current Cloudflare API schema identified a viable server-side credential handoff path that does not require the owner to open a browser or expose a one-time secret in chat:
+
+- The account already has the Secrets Store `default_secrets_store` (store ID `13ae1fbafb7b48d983363b95125e3e20`). Current quota read-back: **0 / 100 secrets used**.
+- Account Access Service Token inventory: **0**. Account Identity Provider inventory: **0**. Dedicated GROUP Access application policy list: **0** (still default-deny).
+- Cloudflare's Service Token create endpoint returns the Client Secret only once. The Secrets Store create-secret API accepts a `value` field marked write-only; Cloudflare documents that it never returns the value. The secret can be created with the `workers` service scope for consumption by a future Provisioner Worker.
+- Therefore the safe provisioning operation can be composed inside one server-side Cloudflare API execution: create the bounded-lifetime Service Token, retain its one-time Client Secret only in the execution's transient memory, immediately submit it as the write-only value to the existing Secrets Store, and return only the token ID plus secret metadata/status. The secret value must never be emitted from the execution result, logged, or copied into chat. If secret persistence fails, the operation must fail closed and disable/revoke the newly created token before returning.
+- This path is a secure server-side handoff into Cloudflare Secrets Store, not proof that a Provisioner Worker already exists or is bound to consume it. A later deployment step must bind the stored secret to the explicitly approved Provisioner Worker using least privilege and verify availability without reading the value back.
+
+No Service Token was created, no secret value was generated or stored, no Access policy or Identity Provider was added, and no Worker binding or application route changed during this operation. AMPHETAMIN remains untouched. GROUP remains default-deny; enrollment/heartbeat endpoints and Scheduler/dispatch remain disabled.
+
+**Next gate:** explicit owner authorization for creating the named 90-day Provisioner Service Token and storing its one-time secret in `default_secrets_store`; then independently verify the secret metadata and add only the exact-token Service Auth policy. Do not create an Identity Provider for machine-to-machine authentication unless a separate human-login requirement is approved.
