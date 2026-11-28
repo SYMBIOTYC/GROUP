@@ -132,3 +132,7 @@ The first Python CI attempt exposed a test-fixture timestamp issue in the PENDIN
 
 
 I0.26.8 production D1 read-only preflight: target DB is confirmed, but production ledger contains only migrations 0001–0003 and no Worker Registry schema. Migrations 0004–0006 remain unapplied; rollout HOLD. See [heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i0268--production-d1-read-only-preflight-2026-11-28).
+
+## I0.26.9 — disposable local D1 migration acceptance
+
+CI now applies migrations 0001–0006 through Wrangler v4 against an isolated local D1 database and asserts six migration ledger rows, all nine critical Worker Registry security triggers, and zero FK violations. Run #298 passed (94/94 runtime tests, 22 migration tests, 8 resolver tests, local D1 acceptance); schema conformance run #305 passed. Production D1 remains unchanged and rollout HOLD pending independent backup/restore rehearsal and explicit authorization.
