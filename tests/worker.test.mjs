@@ -361,7 +361,8 @@ test("Tenant A cannot replay Tenant B idempotency record", async () => {
           };
         }
       };
-    }
+    },
+    async batch() { return []; }
   };
 
   const response = await worker.fetch(new Request("https://group.test/v1/jobs", {
