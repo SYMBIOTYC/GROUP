@@ -557,3 +557,13 @@ No down migration or destructive rollback is approved. Prefer reviewed forward-f
 I0.26.5 outcome: migration review completed, rollout **NOT APPROVED** pending B1–B3 remediation and verification. I0.20 credential provisioning remains independently blocked; registration/heartbeat and Scheduler/dispatch remain disabled.
 
 Canonical details: [GROUP runtime contract I0.26.5](provisioner-runtime-contract.md#i0265--production-d1-migration-rollout-review-2026-11-28).
+
+## I0.26.6 — quarantined enrollment request preparation
+
+GROUP now has a preparation-only composition function that verifies the ES256 Provisioner assertion and validates the exact parsed request body against the enrollment contract. The verifier returns the body parsed from its cloned Request; schema validation consumes that same object, without re-reading the original stream. The original Request body remains readable.
+
+The preparation function does not access D1 and is not wired into `src/index.mjs` or any HTTP route. It remains quarantined pending the dedicated Provisioner Service Binding trust configuration. A caller-controlled `x-symbiotyc-caller` marker does not grant Provisioner authority. This helper does not itself attest the network origin of the Service Binding invocation.
+
+Tests cover valid/invalid signed requests, schema boundaries, body preservation, forged caller marker, and no DB binding access. The first runtime run found a validator bug in required-key iteration; the implementation was corrected and a new CI run is pending.
+
+I0.26.5 production D1 migration HOLD remains unchanged: B1–B3 must be remediated before migrations 0004–0006 can be considered for production application. No live resources or dispatch state changed.
