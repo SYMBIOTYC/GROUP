@@ -95,13 +95,21 @@ function mapRow(row) {
 
 export async function getActivationState(db, tenantId, projectId, now = new Date().toISOString()) {
   validateScope(tenantId, projectId);
-  await db.prepare(
-    "INSERT OR IGNORE INTO amphetamin_activation_state (tenant_id, project_id, updated_at) VALUES (?, ?, ?)"
-  ).bind(tenantId, projectId, now).run();
+  timestamp(now, "now");
   const row = await db.prepare(
     "SELECT activation_remaining_minutes, deployment_streak, burnout_score, recovery_remainder_minutes, updated_at, version FROM amphetamin_activation_state WHERE tenant_id = ? AND project_id = ?"
   ).bind(tenantId, projectId).first();
-  if (!row) throw new Error("activation state could not be initialized");
+  if (!row) {
+    return {
+      activation_remaining_minutes: 0,
+      deployment_streak: 0,
+      drive_multiplier_percent: 100,
+      burnout_score: 0,
+      recovery_remainder_minutes: 0,
+      updated_at: now,
+      version: 0
+    };
+  }
   return mapRow(row);
 }
 
