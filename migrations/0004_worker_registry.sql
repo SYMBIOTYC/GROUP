@@ -55,7 +55,6 @@ CREATE TABLE IF NOT EXISTS worker_enrollment_challenges (
   provisioner_subject TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   consumed_at TEXT,
-  superseded_at TEXT,
   created_at TEXT NOT NULL,
   superseded_at TEXT,
   FOREIGN KEY (worker_id) REFERENCES workers(worker_id) ON DELETE CASCADE,
