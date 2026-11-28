@@ -36,8 +36,10 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
     uint32_t selected;
     uint32_t activation;
     uint32_t multiplier_bonus;
+    uint32_t effective_streak;
     uint32_t multiplier;
     uint32_t projected_burnout;
+    uint64_t burnout_after_deploy;
     uint64_t activation_extension;
     uint64_t recovery_steps;
     uint64_t burnout_reduction;
@@ -46,6 +48,7 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
         in->resource_pressure > 100u || in->overload_score > 100u ||
         in->recovery_score > 100u || in->cooldown_latched > 1u ||
         in->integrity_risk > 1u || in->burnout_score > 100u ||
+        in->burnout_per_deploy > 100u ||
         in->burnout_recovery_per_hour > 100u ||
         in->max_workers > MAX_DEMAND_WORKERS ||
         (in->new_deployments != 0u &&
@@ -61,18 +64,22 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
     activation_extension = (uint64_t)in->new_deployments *
                            in->deployment_extension_minutes;
     if (in->max_activation_minutes != 0u) {
-        uint64_t extended = (uint64_t)activation + activation_extension;
-        activation = (uint32_t)(extended > in->max_activation_minutes
-                                    ? in->max_activation_minutes : extended);
+        uint32_t remaining_room = in->max_activation_minutes - activation;
+        activation = activation_extension >= remaining_room
+                         ? in->max_activation_minutes
+                         : activation + (uint32_t)activation_extension;
     }
     recovery_steps = in->recovery_minutes / 60u;
     burnout_reduction = recovery_steps * in->burnout_recovery_per_hour;
     projected_burnout = burnout_reduction >= in->burnout_score
                             ? 0u : (uint32_t)(in->burnout_score - burnout_reduction);
-    projected_burnout += (uint64_t)in->new_deployments * in->burnout_per_deploy;
-    if (projected_burnout > 100u) projected_burnout = 100u;
-    multiplier_bonus = in->deployment_streak >= 5u
-                           ? 50u : in->deployment_streak * 10u;
+    burnout_after_deploy = (uint64_t)projected_burnout +
+                           (uint64_t)in->new_deployments * in->burnout_per_deploy;
+    projected_burnout = burnout_after_deploy > 100u ? 100u : (uint32_t)burnout_after_deploy;
+    effective_streak = in->deployment_streak >= 5u -
+                           (in->new_deployments >= 5u ? 5u : in->new_deployments)
+                           ? 5u : in->deployment_streak + in->new_deployments;
+    multiplier_bonus = effective_streak >= 5u ? 50u : effective_streak * 10u;
     multiplier = 100u + multiplier_bonus;
 
     /* Integrity/security failure is the only unconditional hard stop. */
