@@ -166,15 +166,20 @@ export async function applyActivationEvent(db, tenantId, projectId, eventId, eve
         next.recovery_remainder_minutes, next.updated_at, tenantId, projectId, row.version,
         tenantId, projectId, eventId),
       db.prepare(
-        "UPDATE amphetamin_activation_events SET applied_at = ? WHERE tenant_id = ? AND project_id = ? AND event_id = ? AND applied_at IS NULL AND changes() = 1"
+        "UPDATE amphetamin_activation_events SET applied_at = ? WHERE tenant_id = ? AND project_id = ? AND event_id = ? AND applied_at IS NULL"
       ).bind(now, tenantId, projectId, eventId)
     ]);
-    if ((batch[0]?.meta?.changes ?? 0) === 1) {
+    if ((batch[0]?.meta?.changes ?? 0) === 1 && (batch[1]?.meta?.changes ?? 0) === 1) {
       const saved = await db.prepare(
         "SELECT activation_remaining_minutes, deployment_streak, burnout_score, recovery_remainder_minutes, updated_at, version FROM amphetamin_activation_state WHERE tenant_id = ? AND project_id = ?"
       ).bind(tenantId, projectId).first();
       if (!saved) throw new Error("activation state could not be read after commit");
       return { ...mapRow(saved), replayed: false };
+    }
+    if ((batch[0]?.meta?.changes ?? 0) === 1 || (batch[1]?.meta?.changes ?? 0) === 1) {
+      const error = new Error("activation state and event application did not commit as a matched pair");
+      error.code = "ACTIVATION_EVENT_COMMIT_INCONSISTENT";
+      throw error;
     }
   }
   const error = new Error("activation state changed too frequently; retry with the same event_id");
