@@ -103,6 +103,53 @@ static void test_cooldown_releases_only_on_recovery_signals(void) {
     assert(out.worker_count == 1);
 }
 
+static void test_high_pressure_uses_maximum_drive_and_hunts_capacity(void) {
+    AmphetaminInput in = {0};
+    in.backlog = 40;
+    in.resource_pressure = 95;
+    in.overload_score = 95;
+    in.available_credits = 100;
+    in.max_credits = 100;
+    in.quality_score = 100;
+    in.max_workers = 16;
+    in.random_u32 = 0;
+    AmphetaminDecision out = amphetamin_evaluate(&in);
+    assert(out.mode == AMPHETAMIN_RESOURCE_HUNT);
+    assert(out.worker_count >= 1 && out.worker_count <= 16);
+    assert(out.request_capacity == 1);
+    assert(out.request_refill == 0);
+}
+
+static void test_maximum_drive_uses_bounded_capacity_without_pressure_hunt(void) {
+    AmphetaminInput in = {0};
+    in.backlog = 40;
+    in.resource_pressure = 75;
+    in.overload_score = 75;
+    in.available_credits = 100;
+    in.max_credits = 100;
+    in.quality_score = 100;
+    in.max_workers = 16;
+    in.random_u32 = 0;
+    AmphetaminDecision out = amphetamin_evaluate(&in);
+    assert(out.mode == AMPHETAMIN_MAXIMUM_DRIVE);
+    assert(out.worker_count >= 1 && out.worker_count <= 16);
+    assert(out.request_capacity == 0);
+}
+
+static void test_integrity_risk_forces_hard_stop(void) {
+    AmphetaminInput in = {0};
+    in.backlog = 100;
+    in.integrity_risk = 1;
+    in.available_credits = 100;
+    in.max_credits = 100;
+    in.quality_score = 100;
+    in.max_workers = 16;
+    AmphetaminDecision out = amphetamin_evaluate(&in);
+    assert(out.mode == AMPHETAMIN_HARD_STOP);
+    assert(out.worker_count == 0);
+    assert(out.request_capacity == 0);
+}
+
 int main(void) {
     test_idle_does_not_consume_budget();
     test_backlog_activates_boost();
@@ -111,6 +158,9 @@ int main(void) {
     test_bad_quality_fails_closed();
     test_cooldown_is_latched_without_a_timer();
     test_cooldown_releases_only_on_recovery_signals();
-    puts("AMPHETAMIN C policy tests: 7 passed");
+    test_high_pressure_uses_maximum_drive_and_hunts_capacity();
+    test_maximum_drive_uses_bounded_capacity_without_pressure_hunt();
+    test_integrity_risk_forces_hard_stop();
+    puts("AMPHETAMIN C policy tests: 10 passed");
     return 0;
 }
