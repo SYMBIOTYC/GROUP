@@ -369,5 +369,31 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
             )
 
 
+    def test_challenge_cannot_be_superseded_before_expiry(self):
+        self.db.execute(
+            """INSERT INTO worker_enrollment_challenges
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, consumed_at, created_at, superseded_at)
+            VALUES ('challenge-not-expired', 'worker-a', ?, 'provisioner:test',
+                    '2026-11-28T12:00:00Z', NULL, '2026-11-28T10:00:00Z', NULL)""",
+            ("7" * 64,),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_enrollment_challenges SET superseded_at='2026-11-28T11:00:00Z' WHERE challenge_id='challenge-not-expired'"
+            )
+
+    def test_pending_provisioning_request_cannot_carry_completion_fields(self):
+        self.db.executescript((ROOT / "migrations" / "0006_worker_provisioning_requests.sql").read_text(encoding="utf-8"))
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_provisioning_requests
+                (provisioning_request_id, provisioner_subject, idempotency_key_hash, request_digest,
+                 state, outcome_code, outcome_json, correlation_id, created_at, updated_at, expires_at)
+                VALUES ('request-pending-outcome', 'provisioner:a', ?, ?, 'PENDING',
+                        'ENROLLED', '{"worker_id":"worker-a"}', 'corr-a', 'now', 'now', 'later')""",
+                ("8" * 64, "9" * 64),
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
