@@ -39,9 +39,15 @@ class AmphetaminActivationMigrationTests(unittest.TestCase):
         self.assertEqual(
             self.db.execute("SELECT COUNT(*) FROM amphetamin_activation_events").fetchone()[0], 1
         )
-        with self.assertRaises(sqlite3.IntegrityError):
-            self.db.execute(sql, ("tenant-a", "project-a", "deploy-0001", "tick",
-                                  "2026-11-28T10:01:00.000Z", None))
+        self.db.execute(sql, ("tenant-a", "project-a", "deploy-0001", "tick",
+                              "2026-11-28T10:01:00.000Z", None))
+        self.assertEqual(
+            self.db.execute(
+                "SELECT event_type, occurred_at FROM amphetamin_activation_events WHERE event_id = ?",
+                ("deploy-0001",),
+            ).fetchone(),
+            ("deployment", "2026-11-28T10:00:00.000Z"),
+        )
 
     def test_event_identity_is_immutable_and_applied_event_cannot_be_reapplied(self):
         self.db.execute(
