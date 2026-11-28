@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def resolver_sql():
     source = (ROOT / "src" / "worker-credential-resolver.mjs").read_text(encoding="utf-8")
-    match = re.search(r"const LOOKUP_SQL = `([\\s\\S]*?)`;", source)
+    match = re.search(r"const LOOKUP_SQL = `([\s\S]*?)`;", source)
     if not match:
         raise AssertionError("LOOKUP_SQL template not found in resolver source")
     return match.group(1)
