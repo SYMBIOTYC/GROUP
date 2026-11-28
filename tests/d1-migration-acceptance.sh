@@ -58,7 +58,7 @@ FROM pragma_foreign_key_check;
 OUTPUT="$(npx --yes wrangler@4 d1 execute "$DATABASE" \
   --local --persist-to "$PERSIST" --config "$CONFIG" \
   --command "$SQL" --json)"
-printf '%s\\n' "$OUTPUT"
+printf '%s\n' "$OUTPUT"
 
 for marker in MIGRATION_LEDGER_OK SECURITY_TRIGGERS_OK AMPHETAMIN_TABLES_OK FOREIGN_KEYS_OK; do
   if ! grep -q "$marker" <<<"$OUTPUT"; then
