@@ -95,6 +95,8 @@ WHEN NEW.challenge_id IS NOT OLD.challenge_id
   OR NEW.created_at IS NOT OLD.created_at
   OR (OLD.consumed_at IS NOT NULL AND NEW.consumed_at IS NOT OLD.consumed_at)
   OR (OLD.superseded_at IS NOT NULL AND NEW.superseded_at IS NOT OLD.superseded_at)
+  OR (OLD.superseded_at IS NULL AND NEW.superseded_at IS NOT NULL
+      AND julianday(NEW.expires_at) > julianday(NEW.superseded_at))
 BEGIN
   SELECT RAISE(ABORT, 'enrollment challenge claims and terminal state are immutable');
 END;
