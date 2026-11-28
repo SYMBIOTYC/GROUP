@@ -141,3 +141,50 @@ test("idempotency conflict is returned before policy or quota evaluation", async
   assert.equal(result.status, 409);
   assert.equal(result.body.error.code, "IDEMPOTENCY_CONFLICT");
 });
+
+
+test("capabilities endpoint requires the trusted AMPHETAMIN principal", async () => {
+  const response = await worker.fetch(new Request("https://group.test/v1/capabilities"));
+  const result = await json(response);
+  assert.equal(result.status, 401);
+  assert.equal(result.body.error.code, "INTERNAL_GATEWAY_REQUIRED");
+});
+
+test("capabilities endpoint requires compute:jobs:read", async () => {
+  const principal = { ...basePrincipal, scopes: ["compute:jobs:write"] };
+  const response = await worker.fetch(new Request("https://group.test/v1/capabilities", {
+    headers: trustedHeaders(principal)
+  }), {});
+  const result = await json(response);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.error.code, "FORBIDDEN");
+});
+
+test("capabilities endpoint reports no enabled operations and keeps dispatch disabled", async () => {
+  const calls = [];
+  const db = {
+    prepare(sql) {
+      calls.push(sql);
+      return {
+        bind(...values) {
+          assert.deepEqual(values, ["tenant-test", "project-test"]);
+          return {
+            first: async () => ({ max_active_jobs: 3, max_cpu_millis_per_job: 1000 }),
+            all: async () => ({ results: [] })
+          };
+        }
+      };
+    },
+    batch: async () => { throw new Error("capabilities must be read-only"); }
+  };
+  const response = await worker.fetch(new Request("https://group.test/v1/capabilities", {
+    headers: trustedHeaders()
+  }), { DB: db });
+  const result = await json(response);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.protocol, "symbiotyc.compute.v1");
+  assert.equal(result.body.dispatch_enabled, false);
+  assert.equal(result.body.job_submission_enabled, false);
+  assert.deepEqual(result.body.enabled_operations, []);
+  assert.equal(calls.length, 2);
+});
