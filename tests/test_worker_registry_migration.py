@@ -98,6 +98,43 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("DELETE FROM worker_heartbeats WHERE worker_id='worker-a'")
 
+
+    def test_heartbeat_rejects_sequence_gap(self):
+        self.db.execute("UPDATE workers SET state='ACTIVE' WHERE worker_id='worker-a'")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_heartbeats VALUES
+                ('worker-a', 2, 1, 'healthy', 0, 0, 0, 'now', 'later')"""
+            )
+
+    def test_heartbeat_rejects_stale_registration_epoch(self):
+        self.db.execute("UPDATE workers SET state='ACTIVE' WHERE worker_id='worker-a'")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_heartbeats VALUES
+                ('worker-a', 1, 0, 'healthy', 0, 0, 0, 'now', 'later')"""
+            )
+
+    def test_heartbeat_rejects_worker_not_active(self):
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_heartbeats VALUES
+                ('worker-a', 1, 1, 'healthy', 0, 0, 0, 'now', 'later')"""
+            )
+
+    def test_accepted_heartbeat_atomically_advances_worker_snapshot(self):
+        self.db.execute("UPDATE workers SET state='ACTIVE' WHERE worker_id='worker-a'")
+        self.db.execute(
+            """INSERT INTO worker_heartbeats VALUES
+            ('worker-a', 1, 1, 'degraded', 1, 500, 1024, 'received', 'lease-end')"""
+        )
+        snapshot = self.db.execute(
+            """SELECT heartbeat_sequence, state, last_heartbeat_at,
+                      lease_expires_at, record_version
+               FROM workers WHERE worker_id='worker-a'"""
+        ).fetchone()
+        self.assertEqual(snapshot, (1, "DEGRADED", "received", "lease-end", 2))
+
     def test_worker_audit_is_append_only_and_tenant_scoped(self):
         self.db.execute(
             """INSERT INTO worker_audit_events VALUES
