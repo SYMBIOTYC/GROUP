@@ -56,16 +56,33 @@ CREATE TABLE IF NOT EXISTS worker_enrollment_challenges (
   expires_at TEXT NOT NULL,
   consumed_at TEXT,
   created_at TEXT NOT NULL,
-  FOREIGN KEY (worker_id) REFERENCES workers(worker_id) ON DELETE CASCADE
+  superseded_at TEXT,
+  FOREIGN KEY (worker_id) REFERENCES workers(worker_id) ON DELETE CASCADE,
+  CHECK (consumed_at IS NULL OR superseded_at IS NULL)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS worker_one_unconsumed_challenge
   ON worker_enrollment_challenges(worker_id)
-  WHERE consumed_at IS NULL;
+  WHERE consumed_at IS NULL AND superseded_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS worker_challenge_expiry
   ON worker_enrollment_challenges(expires_at)
   WHERE consumed_at IS NULL;
+
+
+-- Explicitly supersede expired, unconsumed challenges before enforcing the
+-- one-live-challenge-per-Worker partial unique index. consumed_at remains
+-- reserved for successful proof redemption.
+CREATE TRIGGER IF NOT EXISTS worker_supersede_expired_challenge
+BEFORE INSERT ON worker_enrollment_challenges
+BEGIN
+  UPDATE worker_enrollment_challenges
+  SET superseded_at = NEW.created_at
+  WHERE worker_id = NEW.worker_id
+    AND consumed_at IS NULL
+    AND superseded_at IS NULL
+    AND expires_at <= NEW.created_at;
+END;
 
 CREATE TABLE IF NOT EXISTS worker_credentials (
   credential_id TEXT PRIMARY KEY,
