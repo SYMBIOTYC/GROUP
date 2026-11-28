@@ -134,3 +134,17 @@ Cloudflare account API confirms the account Workers subdomain remains `vladyslav
 The GROUP Worker settings response exposes only its D1 `DB` binding and does not return an authoritative `workers_dev` enablement field. An external HTTP open attempt against the candidate GROUP hostname was inconclusive (the inspection client returned an internal access error, not an origin HTTP status). Therefore candidate hostname reachability is **not verified**.
 
 No Access application, policy, token, Worker setting, or route was created or modified. Do not create Access against the candidate hostname until a real origin-level probe confirms the hostname resolves to the intended GROUP Worker. Keep AMPHETAMIN Access untouched.
+
+## I0.6 — workers.dev routing semantics (read-only, 2026-11-28)
+
+A fresh Cloudflare API read of the deployed GROUP Worker returned `routes: null`, with no custom route attached. The Worker list response does not expose a `workers_dev` flag, and the Workers API schema has no per-script settings endpoint that returns this flag. Account-level Workers settings also do not contain a `workers_dev` control.
+
+Cloudflare's current documentation states that a Worker is assigned a `workers.dev` route by default when created or renamed, and Wrangler defaults `workers_dev` to `true` when neither `route` nor `routes` is configured. It also documents that the route can be explicitly disabled from the dashboard (Workers & Pages → Worker → Settings → Domains & Routes → workers.dev → Disable), so `routes: null` alone is not conclusive proof of current enablement.
+
+References:
+- https://developers.cloudflare.com/workers/configuration/routing/workers-dev/
+- https://developers.cloudflare.com/workers/wrangler/configuration/
+
+The candidate URL remains `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`. The inspection client still cannot provide an origin HTTP response for that URL; reachability and explicit dashboard state remain unverified. Do not change Worker settings or deploy solely to force the route. The next safe verification is to inspect the Worker in Cloudflare Dashboard → Settings → Domains & Routes and confirm the `workers.dev` entry is enabled, then perform an origin-level HTTPS probe. Only after that should the dedicated Access app be considered; do not modify the AMPHETAMIN app or expose enrollment routes.
+
+No Cloudflare resource was changed. I0 remains BLOCKED.
