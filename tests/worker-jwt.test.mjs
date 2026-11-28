@@ -141,3 +141,17 @@ test("requires a durable credential resolver and a fixed issuer/audience", async
   await assert.rejects(verifyWorkerJwt(f.token, { ...f.options, issuer: undefined }), /issuer|configuration/i);
   await assert.rejects(verifyWorkerJwt(f.token, { ...f.options, audience: undefined }), /audience|configuration/i);
 });
+
+test("rejects inconsistent nbf and exp ordering outside bounded skew", async () => {
+  const beforeIssuedAt = await fixture({ iat: now, nbf: now - 60, exp: now + 300 });
+  await assert.rejects(verifyWorkerJwt(beforeIssuedAt.token, beforeIssuedAt.options), /nbf|time/i);
+  const afterExpiry = await fixture({ iat: now, nbf: now + 301, exp: now + 300 });
+  await assert.rejects(verifyWorkerJwt(afterExpiry.token, afterExpiry.options), /nbf|exp|time/i);
+});
+
+test("rejects unsupported JOSE header parameters", async () => {
+  const f = await fixture();
+  const parts = f.token.split(".");
+  const header = jsonPart({ alg: "ES256", typ: "JWT", kid: "group-2026-01", jku: "https://attacker.invalid/keys" });
+  await assert.rejects(verifyWorkerJwt(`${header}.${parts[1]}.${parts[2]}`, f.options), /header|parameter/i);
+});
