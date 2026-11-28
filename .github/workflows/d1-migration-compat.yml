@@ -104,8 +104,24 @@ jobs:
           npx --yes wrangler@4 d1 execute DB --local \
             --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
             --file tests/d1/assert-provisioning-request-completed.sql
-      - name: Verify migration ledger and foreign-key integrity
+      - name: Verify six applied migrations and foreign-key integrity
         run: |
           npx --yes wrangler@4 d1 execute DB --local \
             --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
-            --command "SELECT COUNT(*) AS migration_count FROM d1_migrations; PRAGMA foreign_key_check;"
+            --file tests/d1/assert-migration-ledger-and-fk.sql
+      - name: Verify failed migration rolls back without losing prior migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 d1 migrations apply DB --local --force \
+            --config wrangler.d1-rollback-test.jsonc --persist-to .wrangler/d1-rollback
+          if output=$(npx --yes wrangler@4 d1 migrations apply DB --local --force \
+            --config wrangler.d1-rollback-test.jsonc --persist-to .wrangler/d1-rollback 2>&1); then
+            echo "Expected the deliberately failing migration to abort"
+            exit 1
+          fi
+          echo "$output"
+          echo "$output" | grep -q "table_that_does_not_exist"
+          npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-rollback-test.jsonc --persist-to .wrangler/d1-rollback \
+            --command "CREATE TABLE d1_test_assertions (ok INTEGER NOT NULL CHECK (ok = 1)); INSERT INTO d1_test_assertions SELECT CASE WHEN (SELECT COUNT(*) FROM d1_migrations) = 1 AND EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='migration_baseline') AND NOT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='migration_rollback_probe') AND (SELECT COUNT(*) FROM migration_baseline) = 1 THEN 1 ELSE 0 END; DROP TABLE d1_test_assertions;"
