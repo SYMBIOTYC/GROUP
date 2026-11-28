@@ -100,7 +100,7 @@ PR #10 adds the private approval API and the D1 migration `0003_compute_approval
 - `tests/test_worker_credential_resolver_sqlite.py` — executes the resolver's exact SQL against SQLite after applying migrations 0001, 0004 and 0005; run with `python -m unittest tests.test_worker_credential_resolver_sqlite -v`.
 - `src/provisioner-auth.mjs` and `tests/provisioner-auth.test.mjs` — isolated ES256 Provisioner assertion verifier and focused negative tests; verifier is not wired to an enrollment route and trust keys are not configured.
 - `provisioner/src/provisioner-assertion.mjs` and `tests/provisioner-assertion.test.mjs` — request-bound ES256 Provisioner assertion signer and GROUP-verifier interoperability tests; no runtime key or binding configured.
-- `src/provisioner-request-binding.mjs` and `tests/provisioner-request-binding.test.mjs` — GROUP-side canonical request binding computed from the received HTTP request; the verifier recomputes `rqh`/`ikh` and ignores caller-supplied digest headers. Still not wired to an enrollment route.
+- `src/provisioner-request-binding.mjs` and `tests/provisioner-request-binding.test.mjs` — GROUP-side canonical request binding computed from the received HTTP request; the verifier recomputes `rqh`/`ikh` and ignores caller-supplied digest headers. Runtime CI: 85/85 passed on `001473f90f11d79b71accb411a456a39d7c5785e`. Still not wired to an enrollment route.
 
 
 ## I0.26.4 — production D1 schema inventory
