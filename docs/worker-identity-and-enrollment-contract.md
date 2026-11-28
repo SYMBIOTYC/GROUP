@@ -152,3 +152,28 @@ GitHub Actions verification completed successfully on implementation commit `25c
 The first Python CI attempt exposed a test-fixture timestamp issue in the PENDING → COMPLETED transition test. The fixture was corrected to advance `updated_at`; the successful run above validates the corrected commit. These tests execute against disposable in-memory SQLite databases initialized from the checked-in migrations, not the production D1 database.
 
 **Result:** source-level B1–B3 blockers are addressed and the migration regression suites pass. Production rollout remains HOLD: no migrations have been applied to production D1, no live route/binding/secret has changed, and separate backup/restore readiness plus explicit production migration authorization are still required.
+
+
+## I0.26.8 — Production D1 read-only preflight (2026-11-28)
+
+**Target resolution:** GROUP `wrangler.jsonc` binds `DB` to D1 database `symbiotyc-group-compute-state` (UUID `633d7c14-d335-426c-be7e-2168a43171bc`). Cloudflare account inventory and the database detail endpoint independently confirm that exact name/UUID pair, `version=production`, jurisdiction `eu`, primary region `EEUR`, read replication disabled, and 11 tables. No similarly named database was substituted.
+
+**Production migration ledger:** read-only query of `d1_migrations` returns exactly:
+- `0001_compute_core.sql`
+- `0002_runtime_ledger.sql`
+- `0003_compute_approvals.sql`
+
+The production schema contains none of the Worker Registry / Provisioner tables or indexes. Migrations `0004_worker_registry.sql`, `0005_worker_heartbeat_fencing.sql`, and `0006_worker_provisioning_requests.sql` are therefore **not applied**. The target currently reflects the existing compute/job control-plane schema, not the Worker Registry schema.
+
+**Integrity signals:** `PRAGMA foreign_key_check` returned zero violations; `PRAGMA foreign_keys` returned `1`. A direct `PRAGMA integrity_check` request was rejected by the D1 REST API with `SQLITE_AUTH`; no integrity-check result is claimed. Database metadata reports 11 tables and 159,744 bytes. A current D1 Time Travel bookmark was returned, but this is not evidence of an independent backup, retention policy, or successful restore drill.
+
+**Safety:** all production operations in this preflight were GET requests or SELECT/PRAGMA read-only queries. Query metadata reported `changed_db=false` and `rows_written=0`. No production migration, export/import, restore, schema change, Worker binding, secret, route, Access policy, or dispatch change was performed.
+
+**Decision: HOLD — do not apply migrations 0004–0006 yet.** Before a separately authorized rollout:
+1. obtain an independent export/backup and verify it is retrievable outside the target D1;
+2. define and execute a restore rehearsal against a disposable database, recording recovery point and recovery time;
+3. validate the exact migration SQL against a disposable D1-compatible database and verify post-migration schema/trigger invariants;
+4. compute and archive cryptographic SHA-256 checksums for the exact migration artifacts in the approved release commit;
+5. obtain explicit production migration authorization and a rollback/forward-recovery plan.
+
+This preflight confirms target identity and current migration state only; it does not authorize or execute a production migration.
