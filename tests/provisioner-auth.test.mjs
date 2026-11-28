@@ -6,6 +6,7 @@ import { verifyProvisionerAssertion } from "../src/provisioner-auth.mjs";
 const encoder = new TextEncoder();
 const now = 1_795_875_840;
 const requestDigest = "a".repeat(64);
+const idempotencyKeyHash = "c".repeat(64);
 const issuer = "https://symbiotyc-group-provisioner.internal";
 const audience = "symbiotyc.group.internal-enrollment.v1";
 const subject = "provisioner:group-enrollment";
@@ -39,6 +40,7 @@ async function fixture() {
       exp: now + 45,
       jti: "6d4c7a18-64bd-4a21-8e7f-2e13b19b2b81",
       rqh: requestDigest,
+      ikh: idempotencyKeyHash,
       ...overrides
     };
     const input = `${base64url(encoder.encode(JSON.stringify(header)))}.${base64url(encoder.encode(JSON.stringify(claims)))}`;
@@ -60,7 +62,7 @@ test("accepts a valid, request-bound ES256 Provisioner assertion", async () => {
     headers: { authorization: `Bearer ${jwt}`, "x-symbiotyc-caller": "amphetamin" },
     body: "{}"
   });
-  const result = await verifyProvisionerAssertion(request, f.env, { requestDigest, nowSeconds: now });
+  const result = await verifyProvisionerAssertion(request, f.env, { requestDigest, idempotencyKeyHash, nowSeconds: now });
   assert.equal(result.ok, true);
   assert.equal(result.subject, subject);
 });
@@ -104,7 +106,7 @@ test("rejects wrong audience, expired assertion, and request digest mismatch", a
         headers: { authorization: `Bearer ${jwt}` },
         body: "{}"
       });
-      const result = await verifyProvisionerAssertion(request, f.env, { requestDigest: digest, nowSeconds: now });
+      const result = await verifyProvisionerAssertion(request, f.env, { requestDigest: digest, idempotencyKeyHash, nowSeconds: now });
       assert.equal(result.ok, false);
       assert.equal(result.code, "PROVISIONER_ASSERTION_INVALID");
     });
