@@ -157,5 +157,63 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
 
 
 
+    def test_provisioning_request_ledger_binds_subject_key_and_digest(self):
+        self.db.executescript((ROOT / "migrations" / "0006_worker_provisioning_requests.sql").read_text(encoding="utf-8"))
+        self.db.execute(
+            """INSERT INTO worker_provisioning_requests
+               (provisioning_request_id, provisioner_subject, idempotency_key_hash,
+                request_digest, state, correlation_id, created_at, updated_at)
+               VALUES ('request-1', 'provisioner:a', ?, ?, 'PENDING', 'corr-1', 'now', 'now')""",
+            ("a" * 64, "b" * 64),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_provisioning_requests
+                   (provisioning_request_id, provisioner_subject, idempotency_key_hash,
+                    request_digest, state, correlation_id, created_at, updated_at)
+                   VALUES ('request-2', 'provisioner:a', ?, ?, 'PENDING', 'corr-2', 'now', 'now')""",
+                ("a" * 64, "c" * 64),
+            )
+
+    def test_provisioning_request_key_is_scoped_to_provisioner_subject(self):
+        self.db.executescript((ROOT / "migrations" / "0006_worker_provisioning_requests.sql").read_text(encoding="utf-8"))
+        self.db.execute(
+            """INSERT INTO worker_provisioning_requests
+               (provisioning_request_id, provisioner_subject, idempotency_key_hash,
+                request_digest, state, correlation_id, created_at, updated_at)
+               VALUES ('request-1', 'provisioner:a', ?, ?, 'PENDING', 'corr-1', 'now', 'now')""",
+            ("a" * 64, "b" * 64),
+        )
+        self.db.execute(
+            """INSERT INTO worker_provisioning_requests
+               (provisioning_request_id, provisioner_subject, idempotency_key_hash,
+                request_digest, state, correlation_id, created_at, updated_at)
+               VALUES ('request-2', 'provisioner:b', ?, ?, 'PENDING', 'corr-2', 'now', 'now')""",
+            ("a" * 64, "b" * 64),
+        )
+
+    def test_provisioning_request_digest_and_hash_are_fixed_length(self):
+        self.db.executescript((ROOT / "migrations" / "0006_worker_provisioning_requests.sql").read_text(encoding="utf-8"))
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_provisioning_requests
+                   (provisioning_request_id, provisioner_subject, idempotency_key_hash,
+                    request_digest, state, correlation_id, created_at, updated_at)
+                   VALUES ('request-1', 'provisioner:a', 'short', ?, 'PENDING', 'corr-1', 'now', 'now')""",
+                ("b" * 64,),
+            )
+
+    def test_provisioning_request_worker_reference_must_exist(self):
+        self.db.executescript((ROOT / "migrations" / "0006_worker_provisioning_requests.sql").read_text(encoding="utf-8"))
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_provisioning_requests
+                   (provisioning_request_id, provisioner_subject, idempotency_key_hash,
+                    request_digest, worker_id, state, correlation_id, created_at, updated_at)
+                   VALUES ('request-1', 'provisioner:a', ?, ?, 'missing-worker', 'COMPLETED', 'corr-1', 'now', 'now')""",
+                ("a" * 64, "b" * 64),
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
