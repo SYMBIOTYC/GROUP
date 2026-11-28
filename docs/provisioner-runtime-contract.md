@@ -259,3 +259,55 @@ Direct `sqlite_master` inspection confirms the existing compute/runtime/approval
 **Gate:** production D1 schema is not ready for Worker credential resolution or transactional heartbeat. Registration/heartbeat remain absent/disabled; no Worker is schedulable; Scheduler/dispatch remain disabled. I0.20 credential-provisioning block remains independent and unchanged.
 
 Canonical transaction gate: [F2.3 heartbeat transaction boundary](worker-heartbeat-transaction-boundary.md#i0264--read-only-production-d1-schema-inventory-2026-11-28).
+
+
+## I0.26.5 — production D1 migration rollout review (2026-11-28)
+
+**Review result: NOT APPROVED FOR PRODUCTION APPLICATION.** This is a source/schema review only. No migration, production D1 object, Worker binding, route, secret, deployment, or dispatch setting was changed.
+
+### Target and migration order
+
+The intended target remains the exact deployed binding established in I0.26.4: GROUP Worker `symbiotyc-group-control-plane`, binding `DB`, database `symbiotyc-group-compute-state`. Production currently records only migrations 0001–0003.
+
+The reviewed dependency order is:
+1. `0004_worker_registry.sql` — creates `workers`, capabilities, enrollment challenges, credentials, heartbeats and Worker audit tables; references `project_quotas(tenant_id, project_id)` from 0001.
+2. `0005_worker_heartbeat_fencing.sql` — creates heartbeat admission and snapshot triggers on tables from 0004.
+3. `0006_worker_provisioning_requests.sql` — creates the Provisioner idempotency ledger and references `workers(worker_id)` from 0004.
+
+Do not reorder these migrations. 0005 depends on 0004; 0006 also depends on 0004. Apply only through the approved D1 migration mechanism, sequentially, after a separate explicit production-change authorization.
+
+### Blocking source findings
+
+**B1 — heartbeat trigger omits Worker revocation timestamp.** In 0005, both the BEFORE INSERT predicate and AFTER INSERT snapshot update require matching epoch and ACTIVE/DEGRADED state, but neither requires `workers.revoked_at IS NULL`. I0.26.3 deliberately added this independent guard to the credential resolver because state and revocation timestamp can be inconsistent. Align the trigger with that invariant before rollout; add a regression case with `state='ACTIVE'` and non-NULL `revoked_at`, proving that the heartbeat insert and snapshot update are rejected atomically.
+
+**B2 — expired challenge can permanently occupy the one-unconsumed slot.** In 0004, partial unique index `worker_one_unconsumed_challenge` covers every row with `consumed_at IS NULL`; it does not exclude expired challenges. An expired, unconsumed challenge therefore blocks a replacement challenge for that Worker. Define an explicit expiry/supersession lifecycle and test replacement after expiry before applying the migration. Do not silently overload `consumed_at` to mean expired unless the contract is deliberately revised.
+
+**B3 — provisioning request claims are not database-immutable.** In 0006, the unique key binds `(provisioner_subject, idempotency_key_hash)`, but no trigger prevents updates to `provisioner_subject`, `idempotency_key_hash`, or `request_digest`; no trigger constrains the state transition beyond the row CHECK. Add database-enforced immutable-claim and allowed-transition rules (PENDING → COMPLETED only, with completion fields consistent), or provide an equally strong transaction-boundary proof and explicit accepted risk. Include tests for changed digest/key/subject and illegal state transitions.
+
+### Preflight checklist (read-only)
+
+Before a separately approved rollout:
+- Re-read deployed Worker settings and confirm the `DB` binding still resolves to the I0.26.4 database UUID; do not select a database by display name alone.
+- Read `d1_migrations`; require exactly the expected baseline 0001–0003 and stop on unknown, partial, or divergent history.
+- Inventory `sqlite_master` for collisions with every table/index/trigger name in 0004–0006; verify required 0001 parent table and composite primary key.
+- Capture `PRAGMA table_info`, `index_list`, `foreign_key_list`, and trigger SQL for relevant baseline objects; run `PRAGMA foreign_key_check` where supported.
+- Confirm a current recoverable D1 backup/restore procedure and its recovery-point implications with the platform owner before any DDL. If recovery cannot be demonstrated, do not proceed.
+- Confirm the corrected migration files, their checksums, CI results, and migration runner behavior against a disposable D1-compatible test database.
+
+### Apply and postflight acceptance criteria
+
+After explicit authorization only, apply 0004, 0005, 0006 sequentially with no concurrent migration runner. Stop immediately on any error; do not manually mark a migration as applied or continue past a partial/ambiguous result.
+
+Postflight must verify:
+- migration ledger records 0001–0006 exactly once and in order;
+- all expected Worker Registry tables, indexes, partial indexes and triggers exist with exact reviewed SQL;
+- foreign-key integrity check returns no violations;
+- revoked Worker, expired challenge replacement, replay/gap/stale epoch, over-capacity, and provisioning-ledger mutation negative cases fail closed;
+- transaction failure injection in a disposable environment proves no partial heartbeat/audit/outbox or enrollment/request/challenge state;
+- live production Worker still has no registration/heartbeat route or scheduler activation unless separately authorized.
+
+### Recovery and rollback constraints
+
+No down migrations are supplied or approved. Do not use destructive DROP-based rollback on production as a routine recovery method. Prefer a reviewed forward-fix for a faulty additive schema. A restore is a separate incident action requiring verified backup availability, restore semantics, acceptable data-loss window, and explicit authorization; this review does not claim that a production restore point has been tested.
+
+**Decision:** HOLD. Resolve B1–B3 in migration source and tests, run CI plus disposable D1-compatible acceptance tests, and obtain a separate production migration authorization. I0.20 secure credential provisioning remains an independent blocker. Enrollment/heartbeat and Scheduler/dispatch stay disabled.
