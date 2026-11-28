@@ -136,11 +136,18 @@ I0.26.8 production D1 read-only preflight: target DB is confirmed, but productio
 
 ## I0.26.9 — disposable local D1 migration acceptance
 
-CI now applies migrations 0001–0007 through Wrangler v4 against an isolated local D1 database and asserts six migration ledger rows, all nine Worker Registry and three AMPHETAMIN security triggers, and zero FK violations. Run #298 passed (94/94 runtime tests, 22 migration tests, 8 resolver tests, local D1 acceptance); schema conformance run #305 passed. Production D1 remains unchanged and rollout HOLD pending independent backup/restore rehearsal and explicit authorization.
+Mainline CI run #298 validated the local D1 migration chain 0001–0006 (94/94 runtime tests, 22 Worker Registry migration tests, 8 resolver tests, local D1 acceptance); schema conformance run #305 passed. That evidence predates AMPHETAMIN migration 0007 and does not validate it.
+
+The AMPHETAMIN integration extends the isolated local-D1 acceptance gate to migrations 0001–0007. The updated script asserts seven migration-ledger rows, all nine Worker Registry plus three AMPHETAMIN triggers, both AMPHETAMIN activation tables, and zero foreign-key violations. This expanded gate is pending CI on the current AMPHETAMIN integration head; no pass is claimed yet. Production D1 remains unchanged and rollout HOLD pending independent backup/restore rehearsal and explicit authorization.
 
 ## I0.26.10 — production backup/restore readiness audit
 
 Read-only checks confirm the production D1 Time Travel bookmark endpoint is available, but no independent export or restore rehearsal exists. The export API may make D1 unavailable to queries while the export runs. No export or restore was executed. Production rollout remains HOLD pending owner approval for full export, independent storage, and a separate disposable restore drill.
+
+
+### I0.26.11 — production D1 backup/restore gate
+
+The I0.26.11 read-only audit confirms Time Travel support but no independently retrievable backup. Cloudflare reports R2 is not enabled for the account context. A full D1 export can block database requests; export, independent storage provisioning, and a remote disposable-D1 restore rehearsal are held for explicit owner approval. Production migrations 0004–0006 remain unapplied. See [worker heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i02611--external-backup-destination-and-restore-rehearsal-gate-2026-11-28) and [Provisioner runtime contract](docs/provisioner-runtime-contract.md#i02611--external-backup-destination-and-restore-rehearsal-gate-2026-11-28).
 
 
 ## AMPHETAMIN policy runtime — mainline integration
