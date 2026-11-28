@@ -61,24 +61,27 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
             )
 
     def test_challenge_hash_cannot_be_reused(self):
-        for worker_id in ("worker-a", "worker-b"):
-            if worker_id == "worker-b":
-                self.db.execute(
-                    """INSERT INTO workers (
-                        worker_id, tenant_id, project_id, pool_id, provisioner_subject,
-                        provider, region, worker_class, trust_class, state,
-                        capacity_max_concurrency, capacity_cpu_millis,
-                        capacity_memory_bytes, capacity_disk_bytes, created_at, updated_at
-                    ) VALUES (?, 'tenant-a', 'project-a', 'pool-a', 'provisioner:test',
-                        'linux_host', 'eu-west', 'cpu', 'persistent', 'PENDING_ENROLLMENT',
-                        1, 1000, 16777216, 0, 'now', 'now')""", (worker_id,)
-                )
-            with self.assertRaises(sqlite3.IntegrityError) if worker_id == "worker-b" else _nullcontext():
-                self.db.execute(
-                    """INSERT INTO worker_enrollment_challenges
-                    VALUES (?, ?, ?, 'provisioner:test', 'later', NULL, 'now')""",
-                    ("challenge-" + worker_id, worker_id, "c" * 64),
-                )
+        self.db.execute(
+            """INSERT INTO workers (
+                worker_id, tenant_id, project_id, pool_id, provisioner_subject,
+                provider, region, worker_class, trust_class, state,
+                capacity_max_concurrency, capacity_cpu_millis,
+                capacity_memory_bytes, capacity_disk_bytes, created_at, updated_at
+            ) VALUES ('worker-b', 'tenant-a', 'project-a', 'pool-a', 'provisioner:test',
+                'linux_host', 'eu-west', 'cpu', 'persistent', 'PENDING_ENROLLMENT',
+                1, 1000, 16777216, 0, 'now', 'now')"""
+        )
+        self.db.execute(
+            """INSERT INTO worker_enrollment_challenges
+            VALUES ('challenge-a', 'worker-a', ?, 'provisioner:test', 'later', NULL, 'now')""",
+            ("c" * 64,),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                """INSERT INTO worker_enrollment_challenges
+                VALUES ('challenge-b', 'worker-b', ?, 'provisioner:test', 'later', NULL, 'now')""",
+                ("c" * 64,),
+            )
 
     def test_heartbeat_sequence_is_unique_per_worker_and_append_only(self):
         self.db.execute(
