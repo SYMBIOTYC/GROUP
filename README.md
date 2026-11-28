@@ -2,7 +2,7 @@
 
 **Role:** Compute Control Plane for the SYMBIOTYC Cloud federation.  
 **Protocol:** `symbiotyc.compute.v1`  
-**Status:** GROUP Worker is present in the primary Cloudflare production account with its dedicated D1 binding; private AMPHETAMIN Service Binding and end-to-end integration are not yet verified. No compute dispatch is enabled.
+**Status:** GROUP Worker is deployed in the primary Cloudflare production account with its dedicated EU D1 binding. AMPHETAMIN has a private Service Binding to GROUP. The public GROUP hostname and preview URLs are disabled. No compute dispatch is enabled.
 
 GROUP owns compute-resource coordination across `CLOUD-COMPUTE`, `CLOUD-CPU`, and `CLOUD-VPS`. It is the authority for Worker registration and eligibility, scheduling, capacity reservations, dispatch coordination, quotas, policy, lifecycle state, and audit.
 
@@ -63,6 +63,6 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 
 ## Implementation status
 
-The repository includes the initial protocol schemas, Job API source core, D1 migration, private Service Binding contract, and passing Node/Python CI. The dedicated EU D1 database `symbiotyc-group-compute-state` has been provisioned and the initial migration applied and verified. The GROUP Worker `symbiotyc-group-control-plane` is present in the primary Cloudflare production account and its live settings show the dedicated D1 binding. Its `workers.dev` subdomain and preview URLs are disabled. The live settings currently show no AMPHETAMIN Service Binding. AMPHETAMIN MCP host deployment and authenticated end-to-end Job submission are not yet verified. Scheduler, dispatcher, Worker agent, provider adapter, result/artifact pipeline, and production dispatch remain disabled until the end-to-end acceptance gates pass.
+The repository includes the initial protocol schemas, Job API source core, D1 migration, private Service Binding contract, and passing Node/Python CI. The dedicated EU D1 database `symbiotyc-group-compute-state` has been provisioned and the initial migration applied and verified. The GROUP Worker `symbiotyc-group-control-plane` is deployed with the dedicated D1 binding; its `workers.dev` subdomain and preview URLs are disabled. The AMPHETAMIN Worker has a live `GROUP` Service Binding to this service. The Access-protected MCP edge exposes only the read-only `group.health` probe. An authenticated external MCP round-trip has not yet been verified. Scheduler, dispatcher, Worker agent, provider adapter, result/artifact pipeline, and production dispatch remain disabled until the end-to-end acceptance gates pass.
 
 The dated [live deployment verification](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md) records the account-side evidence and remaining gaps. A Worker script existing in the account is not proof that the complete compute lifecycle is operational.
