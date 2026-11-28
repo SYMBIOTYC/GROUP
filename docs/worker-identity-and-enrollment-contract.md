@@ -128,3 +128,14 @@ The production rollout review identified three schema-level requirements that mu
 - Migration 0006 must protect Provisioner subject, idempotency-key hash, and request digest from mutation and enforce the intended PENDING → COMPLETED transition invariants.
 
 These are review findings, not applied fixes. Production D1 remains at migrations 0001–0003. Do not apply 0004–0006 or enable enrollment/heartbeat until corrected migrations, negative tests, CI, and a separately authorized rollout are complete. See [I0.26.5 migration rollout review](worker-heartbeat-transaction-boundary.md#i0265--production-d1-migration-rollout-review-2026-11-28).
+
+
+## I0.26.6 — migration defect corrections (2026-11-28)
+
+Implementation is present on the I0.26.6 draft branch; validation remains pending. No production D1 migration was applied.
+
+- **B1 — heartbeat revocation fencing:** both the BEFORE INSERT eligibility predicate and AFTER INSERT snapshot-update predicate in migration 0005 now require `workers.revoked_at IS NULL`. A revoked Worker cannot accept a heartbeat or advance its lease snapshot, including if its state is inconsistently ACTIVE/DEGRADED.
+- **B2 — enrollment challenge lifecycle:** migration 0004 adds `superseded_at`. The one-unconsumed-challenge unique index and expiry index now cover only rows with both `consumed_at IS NULL` and `superseded_at IS NULL`. A BEFORE INSERT trigger supersedes an existing challenge only when its `expires_at <= NEW.created_at`; the replacement operation must provide server-generated UTC `created_at`. A still-unexpired challenge continues to block a replacement. `consumed_at` retains its original meaning.
+- **B3 — Provisioner idempotency ledger:** migration 0006 requires new requests to enter as PENDING with no completion outcome. The only permitted update is one PENDING-to-COMPLETED transition; subject, idempotency-key hash, request digest, request ID, correlation ID, creation time and expiry are immutable. Completion requires a timestamp, non-empty outcome code and JSON outcome. Subsequent updates are rejected.
+
+Regression coverage for the three findings and fixture adjustments is in `tests/test_worker_registry_migration.py`. The test suite has **not yet been executed**: the available GitHub Actions query returned no workflow runs and the execution environment could not resolve github.com for a checkout. SQLite/D1 parity is therefore not claimed. Next gate: execute the complete migration tests in CI and a disposable D1-compatible database, review all results, then request separate authorization before any production rollout.
