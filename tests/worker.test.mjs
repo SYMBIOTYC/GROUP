@@ -242,3 +242,15 @@ test("capabilities endpoint reports no enabled operations and keeps dispatch dis
   assert.deepEqual(result.body.enabled_operations, []);
   assert.equal(calls.length, 2);
 });
+
+
+test("activation event API rejects tick events from service callers; ticks are GROUP-internal", async () => {
+  const response = await worker.fetch(new Request("https://group.test/v1/activation/events", {
+    method: "POST",
+    headers: { ...trustedHeaders(activationServicePrincipal), "content-type": "application/json" },
+    body: JSON.stringify({ event_id: "tick-00000001", event_type: "tick" })
+  }), {});
+  const result = await json(response);
+  assert.equal(result.status, 422);
+  assert.equal(result.body.error.code, "INVALID_ACTIVATION_EVENT");
+});
