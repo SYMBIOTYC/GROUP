@@ -125,3 +125,12 @@ Candidate enrollment origin:
 This is a candidate, not yet a verified live URL: the current Worker inventory/settings response does not expose an authoritative `workers_dev` enablement flag, so reachability must be probed before creating Access policy or publishing enrollment routes. The exact host is reserved for the GROUP control plane; do not reuse the AMPHETAMIN hostname.
 
 No Worker settings, Access applications, policies, or tokens were changed in this step. The account's Workers subdomain already exists, so no new domain or DNS zone is required. The remaining privileged step is Access application + default-deny/Service Auth policy provisioning, followed by a one-time Service Token secret handoff into the future dedicated Provisioner Worker through an approved secure secret-entry path. Do not create a token until that secret handoff path exists.
+
+
+## I0.5 — Hostname and Access preflight (read-only)
+
+Cloudflare account API confirms the account Workers subdomain remains `vladyslavchaplygin.workers.dev`. The account Access application inventory contains only the existing `SYMBIOTYC AMPHETAMIN MCP` application at `symbiotyc-amphetamin-mcp.vladyslavchaplygin.workers.dev`; there is no dedicated `SYMBIOTYC PROVISIONER` application.
+
+The GROUP Worker settings response exposes only its D1 `DB` binding and does not return an authoritative `workers_dev` enablement field. An external HTTP open attempt against the candidate GROUP hostname was inconclusive (the inspection client returned an internal access error, not an origin HTTP status). Therefore candidate hostname reachability is **not verified**.
+
+No Access application, policy, token, Worker setting, or route was created or modified. Do not create Access against the candidate hostname until a real origin-level probe confirms the hostname resolves to the intended GROUP Worker. Keep AMPHETAMIN Access untouched.
