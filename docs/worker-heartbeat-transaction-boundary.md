@@ -628,3 +628,23 @@ The production schema contains none of the Worker Registry / Provisioner tables 
 5. obtain explicit production migration authorization and a rollback/forward-recovery plan.
 
 This preflight confirms target identity and current migration state only; it does not authorize or execute a production migration.
+
+## I0.26.9 — disposable local D1 migration acceptance (2026-11-28)
+
+Added `tests/d1-migration-acceptance.sh` and wired it into `.github/workflows/runtime-ci.yml`. CI installs Wrangler v4 through `npx` and applies the complete migration chain 0001–0006 using explicit `--local` and an isolated `--persist-to .wrangler/d1-migration-acceptance` path. No `--remote` operation or Cloudflare production credential is used.
+
+The acceptance script then asserts:
+- local `d1_migrations` contains exactly six applied migrations;
+- all nine critical B1–B3 registry security triggers exist;
+- `pragma_foreign_key_check` reports zero violations.
+
+**Verification:** GitHub Actions on commit `6d0b3ff16f82aaa4b3d9a0faee6036537287cd96` passed:
+- Runtime suite: run #298 / ID `46156403517`, 94 passed, 0 failed.
+- Worker Registry migration tests: 22 passed.
+- Worker credential resolver tests: 8 passed.
+- Disposable local D1 migration acceptance: passed; all migrations 0001–0006 applied, `MIGRATION_LEDGER_OK`, `REGISTRY_SECURITY_TRIGGERS_OK`, and `FOREIGN_KEYS_OK`.
+- Compute protocol/schema conformance: run #305 / ID `46156403512`, passed.
+
+This is a real Wrangler local-D1 execution, stronger than the in-memory SQLite tests, but it is still not a remote disposable Cloudflare D1 database and not production. The production D1 preflight in I0.26.8 remains authoritative: production has only migrations 0001–0003. No remote D1 operation, production migration, export, restore, route, binding, secret, or dispatch change occurred.
+
+**Remaining production gates:** independent backup/export retrievability, restore rehearsal on a separate disposable database with measured RPO/RTO, final migration checksum archive tied to the approved release commit, and separate explicit production migration authorization. Production rollout remains **HOLD**.
