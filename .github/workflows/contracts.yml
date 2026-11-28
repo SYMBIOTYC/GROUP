@@ -2,7 +2,7 @@ name: Compute protocol contracts
 
 on:
   push:
-    branches: [main]
+    branches: [main, i0-26-6-migration-defect-fixes]
   pull_request:
   workflow_dispatch:
 
