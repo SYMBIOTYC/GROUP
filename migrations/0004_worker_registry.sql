@@ -81,6 +81,44 @@ BEGIN
     AND expires_at <= NEW.created_at;
 END;
 
+
+
+-- Enrollment challenge claims are immutable; consumption and supersession are
+-- terminal, one-way transitions. Expiry is evaluated against server timestamps.
+CREATE TRIGGER IF NOT EXISTS worker_challenge_lifecycle_guard
+BEFORE UPDATE ON worker_enrollment_challenges
+WHEN NEW.challenge_id IS NOT OLD.challenge_id
+  OR NEW.worker_id IS NOT OLD.worker_id
+  OR NEW.challenge_hash IS NOT OLD.challenge_hash
+  OR NEW.provisioner_subject IS NOT OLD.provisioner_subject
+  OR NEW.expires_at IS NOT OLD.expires_at
+  OR NEW.created_at IS NOT OLD.created_at
+  OR (OLD.consumed_at IS NOT NULL AND NEW.consumed_at IS NOT OLD.consumed_at)
+  OR (OLD.superseded_at IS NOT NULL AND NEW.superseded_at IS NOT OLD.superseded_at)
+  OR (
+    NEW.consumed_at IS NOT OLD.consumed_at
+    AND NOT (
+      OLD.consumed_at IS NULL
+      AND NEW.consumed_at IS NOT NULL
+      AND OLD.superseded_at IS NULL
+      AND NEW.superseded_at IS NULL
+      AND OLD.expires_at > NEW.consumed_at
+    )
+  )
+  OR (
+    NEW.superseded_at IS NOT OLD.superseded_at
+    AND NOT (
+      OLD.superseded_at IS NULL
+      AND NEW.superseded_at IS NOT NULL
+      AND OLD.consumed_at IS NULL
+      AND NEW.consumed_at IS NULL
+      AND OLD.expires_at <= NEW.superseded_at
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'worker enrollment challenge claims and terminal state are immutable');
+END;
+
 CREATE TABLE IF NOT EXISTS worker_credentials (
   credential_id TEXT PRIMARY KEY,
   worker_id TEXT NOT NULL,
