@@ -121,6 +121,17 @@ Added a preparation-only GROUP module that composes ES256 Provisioner assertion 
 Worker Registry migration corrections (I0.26.7): see [heartbeat transaction boundary](docs/worker-heartbeat-transaction-boundary.md#i0267--worker-registry-migration-security-corrections-2026-11-28) and [Provisioner runtime contract](docs/provisioner-runtime-contract.md#i0267--worker-registry-migration-security-corrections-2026-11-28). Production migration remains on HOLD.
 
 
+### I0.26.7 verification addendum
+
+GitHub Actions verification completed successfully on implementation commit `25c9b2702998419d8ac9d63be0d8d8fc615dd957`:
+- GROUP runtime + Worker Registry migration/resolver tests: run #276 / ID `46155964495`, success. Node runtime suite: 94 passed; `test_worker_registry_migration.py`: 20 passed; `test_worker_credential_resolver_sqlite.py`: 8 passed.
+- Compute protocol/schema conformance: run #282 / ID `46155964423`, success.
+
+The first Python CI attempt exposed a test-fixture timestamp issue in the PENDING → COMPLETED transition test. The fixture was corrected to advance `updated_at`; the successful run above validates the corrected commit. These tests execute against disposable in-memory SQLite databases initialized from the checked-in migrations, not the production D1 database.
+
+**Result:** source-level B1–B3 blockers are addressed and the migration regression suites pass. Production rollout remains HOLD: no migrations have been applied to production D1, no live route/binding/secret has changed, and separate backup/restore readiness plus explicit production migration authorization are still required.
+
+
 ## AMPHETAMIN policy runtime — mainline integration
 
 The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssembly ABI v1 evaluator are integrated against the current GROUP mainline. The WASM Worker entrypoint is `src/worker.mjs`; it delegates existing routes to `src/index.mjs` and lazily instantiates the policy module for `POST /v1/activation/evaluate`.
