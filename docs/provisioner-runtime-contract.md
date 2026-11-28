@@ -410,3 +410,18 @@ The acceptance script then asserts:
 This is a real Wrangler local-D1 execution, stronger than the in-memory SQLite tests, but it is still not a remote disposable Cloudflare D1 database and not production. The production D1 preflight in I0.26.8 remains authoritative: production has only migrations 0001–0003. No remote D1 operation, production migration, export, restore, route, binding, secret, or dispatch change occurred.
 
 **Remaining production gates:** independent backup/export retrievability, restore rehearsal on a separate disposable database with measured RPO/RTO, final migration checksum archive tied to the approved release commit, and separate explicit production migration authorization. Production rollout remains **HOLD**.
+
+## I0.26.10 — production backup/restore readiness audit (2026-11-28)
+
+Read-only Cloudflare API checks reconfirmed the exact GROUP production D1 target: database `symbiotyc-group-compute-state`, UUID `633d7c14-d335-426c-be7e-2168a43171bc`, `version=production`, EU jurisdiction, 11 tables, 159,744 bytes, read replication disabled. The Time Travel bookmark endpoint returned a current bookmark; the bookmark value is deliberately not copied into repository documentation.
+
+Cloudflare's current D1 API exposes:
+- GET current Time Travel bookmark (read-only);
+- POST database export, which produces a downloadable SQL dump through a one-hour signed URL;
+- POST Time Travel restore, which overwrites the target database in place.
+
+The export endpoint documentation warns that an in-progress export may make the D1 database unavailable to serve queries and must be polled until completion. No export request was issued. No restore request was issued. No SQL dump, signed download URL, or production data rows were retrieved. The current bookmark proves Time Travel is available, not that an independent export has been captured or that restore has been rehearsed.
+
+Cloudflare's published Time Travel retention is plan-dependent (7 days on Workers Free, 30 days on Workers Paid); the account's applicable plan/retention was not independently established in this audit. A bookmark therefore must not be treated as a verified independent backup or as proof of an adequate recovery window.
+
+**Decision: HOLD.** The next action requiring owner approval is a full production D1 SQL export to an approved independent backup destination. This can affect database query availability during export and will contain production data. After that export is safely stored and integrity-checked, a separate disposable D1 database and restore/import rehearsal can establish measured RPO/RTO. No production mutation or data export was performed in I0.26.10.
