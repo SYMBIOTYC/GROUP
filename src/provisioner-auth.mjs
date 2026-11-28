@@ -74,6 +74,8 @@ export async function verifyProvisionerAssertion(request, env, {
 
     if (claims.iat > nowSeconds + CLOCK_SKEW_SECONDS ||
         claims.nbf > nowSeconds + CLOCK_SKEW_SECONDS ||
+        claims.nbf < claims.iat - CLOCK_SKEW_SECONDS ||
+        claims.nbf >= claims.exp ||
         claims.exp <= nowSeconds ||
         claims.exp <= claims.iat ||
         claims.exp - claims.iat > MAX_ASSERTION_LIFETIME_SECONDS ||
@@ -87,7 +89,9 @@ export async function verifyProvisionerAssertion(request, env, {
     } catch {
       return failure("PROVISIONER_TRUST_NOT_CONFIGURED");
     }
-    const jwk = keySet?.[header.kid];
+    const jwk = keySet && typeof keySet === "object" && !Array.isArray(keySet) && Object.hasOwn(keySet, header.kid)
+      ? keySet[header.kid]
+      : null;
     if (!jwk || jwk.kty !== "EC" || jwk.crv !== "P-256" ||
         typeof jwk.x !== "string" || typeof jwk.y !== "string" ||
         jwk.d !== undefined) {
