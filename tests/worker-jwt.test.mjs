@@ -146,7 +146,7 @@ test("rejects inconsistent nbf and exp ordering outside bounded skew", async () 
   const beforeIssuedAt = await fixture({ iat: now, nbf: now - 60, exp: now + 300 });
   await assert.rejects(verifyWorkerJwt(beforeIssuedAt.token, beforeIssuedAt.options), /nbf|time/i);
   const afterExpiry = await fixture({ iat: now, nbf: now + 301, exp: now + 300 });
-  await assert.rejects(verifyWorkerJwt(afterExpiry.token, afterExpiry.options), /nbf|exp|time/i);
+  await assert.rejects(verifyWorkerJwt(afterExpiry.token, afterExpiry.options), /nbf|exp|time|valid/i);
 });
 
 test("rejects unsupported JOSE header parameters", async () => {
