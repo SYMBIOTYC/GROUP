@@ -116,12 +116,6 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
             )
 
 
-class _nullcontext:
-    def __enter__(self):
-        return None
-    def __exit__(self, *_):
-        return False
-
 
 if __name__ == "__main__":
     unittest.main()
