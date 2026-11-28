@@ -82,9 +82,9 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
 
     /* Cooldown is controller-latched; overload alone does not terminate a deployment chain. */
     if (in->cooldown_latched != 0u &&
-         !(in->recovery_score >= RECOVERY_SCORE_MIN &&
-           in->overload_score <= RECOVERY_OVERLOAD_MAX &&
-           in->resource_pressure <= RECOVERY_PRESSURE_MAX))) {
+        !(in->recovery_score >= RECOVERY_SCORE_MIN &&
+          in->overload_score <= RECOVERY_OVERLOAD_MAX &&
+          in->resource_pressure <= RECOVERY_PRESSURE_MAX)) {
         return decision(AMPHETAMIN_COOLDOWN, 0u, 0u, 0u, 2u, activation, 100u, (uint8_t)projected_burnout);
     }
 
@@ -97,6 +97,9 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
     } else {
         demand = in->backlog + in->ambiguous_tasks;
     }
+
+    /* A live activation window sustains drive even between deployment pulses. */
+    if (demand == 0u && activation != 0u) demand = 1u;
 
     /* Situational activation: no clock or fixed schedule is involved. */
     if (demand == 0u && in->resource_pressure < 70u) {
@@ -136,7 +139,7 @@ AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
     if (upper > budget_cap) upper = budget_cap;
 
     if (upper == 0u) {
-        return decision(AMPHETAMIN_REFILL, 0u, 1u, 0u, 4u);
+        return decision(AMPHETAMIN_REFILL, 0u, 1u, 0u, 4u, activation, (uint8_t)multiplier, (uint8_t)projected_burnout);
     }
 
     /* Uniform bounded choice. Host must supply a CSPRNG value. */
