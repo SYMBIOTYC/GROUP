@@ -26,16 +26,9 @@ CREATE TABLE IF NOT EXISTS worker_provisioning_requests (
   UNIQUE (provisioner_subject, idempotency_key_hash),
   FOREIGN KEY (worker_id) REFERENCES workers(worker_id),
   CHECK (
-    (state = 'PENDING'
-      AND completed_at IS NULL
-      AND outcome_code IS NULL
-      AND outcome_json IS NULL)
+    (state = 'PENDING' AND completed_at IS NULL)
     OR
-    (state = 'COMPLETED'
-      AND completed_at IS NOT NULL
-      AND length(outcome_code) BETWEEN 1 AND 64
-      AND outcome_json IS NOT NULL
-      AND worker_id IS NOT NULL)
+    (state = 'COMPLETED' AND completed_at IS NOT NULL)
   )
 );
 
@@ -47,9 +40,8 @@ CREATE INDEX IF NOT EXISTS worker_provisioning_requests_worker
   WHERE worker_id IS NOT NULL;
 
 
--- The idempotency claim is durable: identity, request binding, creation and
--- expiry metadata cannot be rewritten after acceptance.
-CREATE TRIGGER IF NOT EXISTS worker_provisioning_requests_immutable_claims
+-- Request identity and idempotency claims are immutable for the entire lifetime.
+CREATE TRIGGER IF NOT EXISTS worker_provisioning_request_claims_immutable
 BEFORE UPDATE ON worker_provisioning_requests
 WHEN NEW.provisioning_request_id IS NOT OLD.provisioning_request_id
   OR NEW.provisioner_subject IS NOT OLD.provisioner_subject
@@ -58,33 +50,36 @@ WHEN NEW.provisioning_request_id IS NOT OLD.provisioning_request_id
   OR NEW.correlation_id IS NOT OLD.correlation_id
   OR NEW.created_at IS NOT OLD.created_at
   OR NEW.expires_at IS NOT OLD.expires_at
-  OR (OLD.worker_id IS NOT NULL AND NEW.worker_id IS NOT OLD.worker_id)
 BEGIN
   SELECT RAISE(ABORT, 'provisioning request claims are immutable');
 END;
 
--- PENDING may be enriched with its server-created Worker exactly once and
--- completed once. COMPLETED rows are immutable and cannot be reopened.
-CREATE TRIGGER IF NOT EXISTS worker_provisioning_requests_state_transition
+-- Only one complete transition is allowed: PENDING -> COMPLETED.
+-- Completion must contain a Worker, outcome, and completion timestamp.
+CREATE TRIGGER IF NOT EXISTS worker_provisioning_request_transition_guard
 BEFORE UPDATE ON worker_provisioning_requests
-WHEN OLD.state = 'COMPLETED'
-  OR (OLD.state = 'PENDING' AND NEW.state NOT IN ('PENDING', 'COMPLETED'))
-  OR (NEW.state = 'PENDING' AND (
-    NEW.completed_at IS NOT NULL OR
-    NEW.outcome_code IS NOT NULL OR
-    NEW.outcome_json IS NOT NULL
-  ))
-  OR (OLD.state = 'PENDING' AND NEW.state = 'COMPLETED' AND (
-    NEW.completed_at IS NULL OR
-    NEW.outcome_code IS NULL OR length(NEW.outcome_code) NOT BETWEEN 1 AND 64 OR
-    NEW.outcome_json IS NULL OR NOT json_valid(NEW.outcome_json) OR
-    NEW.worker_id IS NULL
-  ))
+WHEN NOT (
+  OLD.state = 'PENDING'
+  AND NEW.state = 'COMPLETED'
+  AND NEW.worker_id IS NOT NULL
+  AND NEW.outcome_code IS NOT NULL
+  AND length(NEW.outcome_code) BETWEEN 1 AND 128
+  AND NEW.outcome_json IS NOT NULL
+  AND NEW.completed_at IS NOT NULL
+  AND NEW.updated_at IS NOT OLD.updated_at
+)
 BEGIN
   SELECT RAISE(ABORT, 'invalid provisioning request state transition');
 END;
 
-CREATE TRIGGER IF NOT EXISTS worker_provisioning_requests_no_delete
+CREATE TRIGGER IF NOT EXISTS worker_provisioning_request_completed_no_update
+BEFORE UPDATE ON worker_provisioning_requests
+WHEN OLD.state = 'COMPLETED'
+BEGIN
+  SELECT RAISE(ABORT, 'completed provisioning requests are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS worker_provisioning_request_no_delete
 BEFORE DELETE ON worker_provisioning_requests
 BEGIN
   SELECT RAISE(ABORT, 'provisioning request ledger is append-only');
