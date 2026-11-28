@@ -160,3 +160,15 @@ The Cloudflare API's dedicated Worker Subdomain endpoint was queried for `symbio
 This is authoritative per-script state: the GROUP Worker `workers.dev` hostname is currently disabled. The candidate URL `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev` must therefore not be treated as reachable. This resolves the earlier uncertainty in I0.5/I0.6; those entries record the evidence available at their review times.
 
 No configuration was changed. Enabling `workers.dev` is a production exposure/configuration change and requires explicit owner authorization. Do not enable preview URLs. After authorization and enablement, verify the exact hostname with an origin-level HTTPS probe, then configure a dedicated default-deny Access application before any enrollment endpoint is introduced. Keep the AMPHETAMIN Access application untouched. I0 remains BLOCKED.
+
+## I0.8 — GROUP workers.dev enabled (2026-11-28)
+
+The owner explicitly authorized enabling the GROUP Worker on the account existing `workers.dev` subdomain while keeping Preview URLs disabled. Cloudflare POST `/accounts/{account_id}/workers/scripts/{script_name}/subdomain` was executed with `{ enabled: true, previews_enabled: false }`. The API returned success, and an immediate independent GET read-back confirmed:
+
+```json
+{"enabled":true,"previews_enabled":false}
+```
+
+The hostname is `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`. This change enables public workers.dev routing only; it does not add an Access application, Service Auth policy, Provisioner token, Worker secret, or enrollment/heartbeat route. AMPHETAMIN configuration was not changed. I0 remains BLOCKED; no Worker is schedulable and Scheduler/dispatch remain disabled.
+
+An external origin probe through the available web inspection client returned an internal inspection error rather than an origin HTTP status. A separate runtime DNS probe could not resolve the hostname because the execution environment DNS lookup failed. Therefore HTTP reachability is not yet verified. Before introducing any enrollment endpoint, establish an origin-level HTTPS response and configure a dedicated default-deny Access application; do not modify the existing AMPHETAMIN Access application.
