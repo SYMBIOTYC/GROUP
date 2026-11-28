@@ -114,7 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes wrangler@4 d1 migrations apply DB --local --force \
-            --config wrangler.d1-rollback-test.jsonc --persist-to .wrangler/d1-rollback
+            --config wrangler.d1-rollback-baseline.jsonc --persist-to .wrangler/d1-rollback
           if output=$(npx --yes wrangler@4 d1 migrations apply DB --local --force \
             --config wrangler.d1-rollback-test.jsonc --persist-to .wrangler/d1-rollback 2>&1); then
             echo "Expected the deliberately failing migration to abort"
