@@ -135,6 +135,9 @@ async function activationStateRoute(request, env, principal, correlation, eventI
         !["deployment", "tick"].includes(body.event_type)) {
       return errorResponse(422, "INVALID_ACTIVATION_EVENT", "event_id and event_type (deployment or tick) are required; timestamps are assigned by GROUP.", correlation);
     }
+    if (body.event_type === "tick") {
+      return errorResponse(403, "INTERNAL_TICK_ONLY", "Tick events are generated only by the internal GROUP controller.", correlation);
+    }
     const dbError = databaseUnavailable(env, correlation);
     if (dbError) return dbError;
     const state = await applyActivationEvent(
