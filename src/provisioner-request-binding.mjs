@@ -19,11 +19,11 @@ function canonicalJson(value, depth = 0) {
     return JSON.stringify(value);
   }
   if (Array.isArray(value)) {
-    return `[${value.map((item) => canonicalJson(item, depth + 1)).join(",")}]`;
+    return "[" + value.map((item) => canonicalJson(item, depth + 1)).join(",") + "]";
   }
   if (typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
     const keys = Object.keys(value).sort();
-    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key], depth + 1)}`).join(",")}}`;
+    return "{" + keys.map((key) => JSON.stringify(key) + ":" + canonicalJson(value[key], depth + 1)).join(",") + "}";
   }
   throw new TypeError("unsupported JSON value");
 }
@@ -40,10 +40,7 @@ export async function computeProvisionerRequestBinding(request) {
     if (!(request instanceof Request) || request.method !== EXPECTED_METHOD) return failure();
 
     const url = new URL(request.url);
-    if (url.pathname !== EXPECTED_PATH || url.search || url.hash ||
-    if (url.pathname !== EXPECTED_PATH || url.search || url.hash ||
-      return failure();
-    }
+    if (url.pathname !== EXPECTED_PATH || url.search || url.hash) return failure();
 
     const idempotencyKey = request.headers.get("idempotency-key") || "";
     if (!IDEMPOTENCY_KEY.test(idempotencyKey)) return failure();
