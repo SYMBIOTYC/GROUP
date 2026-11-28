@@ -101,3 +101,14 @@ Constraints and indexes must enforce unique identity, one current epoch, one-tim
 - **I6:** registry is deployed; scheduler still remains disabled until reservation/dispatcher gates pass.
 
 No Worker Registry endpoint or production dispatch may be enabled before I0–I5. The current AMPHETAMIN Service Binding is not an enrollment authority.
+
+
+## Provisioner runtime boundary v1
+
+The separate Provisioner deployment, Access ingress, private GROUP Service Binding, enrollment request/proof schemas, one-time challenge exchange, and ES256 Worker JWT profile are specified normatively in [Provisioner Runtime and Enrollment Boundary v1](provisioner-runtime-contract.md).
+
+Machine-readable contracts:
+- `contracts/provisioner-enrollment-request-v1.schema.json`
+- `contracts/worker-enrollment-proof-v1.schema.json`
+
+These schemas reject caller-selected tenant/project/worker identity, trust class, capabilities, and extra fields. They do not imply that enrollment routes or credentials are deployed.
