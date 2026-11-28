@@ -12,7 +12,7 @@ permissions:
 jobs:
   runtime-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,3 +51,15 @@ jobs:
         run: node --test wasm-tests/amphetamin-wasm-abi.test.mjs
       - name: Verify Wrangler Worker bundle with the compiled WASM module
         run: npx --yes wrangler@latest deploy --dry-run --outdir=dist
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Worker Registry, AMPHETAMIN migration, and resolver tests
+        run: |
+          python tests/test_worker_registry_migration.py
+          python tests/test_worker_credential_resolver_sqlite.py
+          python tests/test_amphetamin_migration.py
+      - name: Apply all migrations to disposable local D1 and assert security triggers
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: bash tests/d1-migration-acceptance.sh
