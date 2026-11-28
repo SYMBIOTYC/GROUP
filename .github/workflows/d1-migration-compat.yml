@@ -56,6 +56,14 @@ jobs:
             --file tests/d1/replace-expired-challenge.sql
           if output=$(npx --yes wrangler@4 d1 execute DB --local \
             --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/reject-superseded-challenge-reopen.sql 2>&1); then
+            echo "Expected superseded challenge to remain terminal, but SQL succeeded"
+            exit 1
+          fi
+          echo "$output"
+          echo "$output" | grep -q "challenge claims and terminal state are immutable"
+          if output=$(npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
             --file tests/d1/reject-live-challenge-replacement.sql 2>&1); then
             echo "Expected live challenge to retain its unique slot, but SQL succeeded"
             exit 1
@@ -81,6 +89,14 @@ jobs:
             --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
             --file tests/d1/reject-completed-request-reopen.sql 2>&1); then
             echo "Expected completed request to be immutable, but SQL succeeded"
+            exit 1
+          fi
+          echo "$output"
+          echo "$output" | grep -q "claims are immutable"
+          if output=$(npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/reject-completed-worker-rebind.sql 2>&1); then
+            echo "Expected completed request Worker binding to be immutable, but SQL succeeded"
             exit 1
           fi
           echo "$output"
