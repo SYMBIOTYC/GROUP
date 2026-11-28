@@ -172,3 +172,22 @@ The owner explicitly authorized enabling the GROUP Worker on the account existin
 The hostname is `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`. This change enables public workers.dev routing only; it does not add an Access application, Service Auth policy, Provisioner token, Worker secret, or enrollment/heartbeat route. AMPHETAMIN configuration was not changed. I0 remains BLOCKED; no Worker is schedulable and Scheduler/dispatch remain disabled.
 
 An external origin probe through the available web inspection client returned an internal inspection error rather than an origin HTTP status. A separate runtime DNS probe could not resolve the hostname because the execution environment DNS lookup failed. Therefore HTTP reachability is not yet verified. Before introducing any enrollment endpoint, establish an origin-level HTTPS response and configure a dedicated default-deny Access application; do not modify the existing AMPHETAMIN Access application.
+
+
+## I0.9 — GROUP Access application created (2026-11-28)
+
+The owner explicitly authorized creation of a dedicated Cloudflare Access application for the GROUP `workers.dev` hostname with default-deny. Cloudflare account API `POST /accounts/{account_id}/access/apps` created the following self-hosted application:
+
+- Name: `SYMBIOTYC GROUP Control Plane`
+- Application ID: `2db93e50-e75b-4674-b55e-47631a2b7acf`
+- Protected hostname: `symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`
+- Type: `self_hosted`
+- Session duration: `1h`
+- Access policies: **none** (`policies: []` on create response and independent GET read-back)
+- App Launcher visibility: disabled
+- OAuth/DCR: not configured
+- Service Tokens: none created
+
+Cloudflare's Access policy model is default-deny: with no Allow policy attached, the application grants no access. The app list was re-read after creation and contains exactly the dedicated GROUP app plus the pre-existing AMPHETAMIN app. The AMPHETAMIN app ID `eef48749-8655-44cf-b807-84b755fbfe22`, its owner-email Allow policy, and its OAuth/DCR configuration were unchanged.
+
+This closes the unauthenticated Access path at the hostname layer; it does **not** implement Provisioner authentication, Worker credentials, enrollment, or heartbeat. No Service Token, signing secret, Worker binding, route, or application code was created or changed. I0 remains BLOCKED; registration/heartbeat routes remain absent and Scheduler/dispatch remain disabled. Origin-level end-to-end denial has not yet been independently probed from an external client.
