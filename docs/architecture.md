@@ -109,3 +109,8 @@ All mutating endpoints require idempotency or version preconditions and an appen
 8. Connect AMPHETAMIN MCP only to the authenticated Job API.
 9. Pass tenant isolation, quota, idempotency, restart recovery, failure injection, and end-to-end acceptance tests.
 10. Enable production dispatch only after the full release gate is evidenced.
+
+
+## 2.2 Durable Worker Registry storage foundation
+
+Migration `0004_worker_registry.sql` adds durable Worker identity, policy-granted capabilities, hashed one-time enrollment challenges, credential identifiers/hashes, append-only heartbeat observations, lease indexes, and tenant/project-bound append-only Worker audit. Its presence is a storage foundation only: the migration has not been applied to production D1 by this commit, no registration/heartbeat routes are exposed, and no Worker is thereby enrolled or schedulable. Regression coverage is in `tests/test_worker_registry_migration.py`.
