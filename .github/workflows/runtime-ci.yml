@@ -20,3 +20,10 @@ jobs:
           node-version: "22"
       - name: Run runtime unit tests
         run: node --test tests/*.test.mjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Worker Registry migration and resolver tests
+        run: |
+          python tests/test_worker_registry_migration.py
+          python tests/test_worker_credential_resolver_sqlite.py
