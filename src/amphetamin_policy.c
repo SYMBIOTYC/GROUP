@@ -1,0 +1,90 @@
+#include "amphetamin_policy.h"
+
+#define QUALITY_FLOOR 70u
+#define REFILL_THRESHOLD_PERCENT 15u
+#define OVERLOAD_CUTOFF 90u
+#define MAX_DEMAND_WORKERS 64u
+
+static AmphetaminDecision decision(AmphetaminMode mode, uint32_t workers,
+                                   uint8_t refill, uint8_t reason) {
+    AmphetaminDecision out;
+    out.mode = mode;
+    out.worker_count = workers;
+    out.request_refill = refill;
+    out.reason_code = reason;
+    return out;
+}
+
+AmphetaminDecision amphetamin_evaluate(const AmphetaminInput *in) {
+    uint32_t demand;
+    uint32_t demand_workers;
+    uint32_t quality_cap;
+    uint32_t budget_cap;
+    uint32_t upper;
+    uint32_t lower;
+    uint32_t selected;
+
+    if (in == 0 || in->quality_score > 100u ||
+        in->resource_pressure > 100u || in->overload_score > 100u ||
+        in->max_workers > MAX_DEMAND_WORKERS ||
+        in->available_credits > in->max_credits) {
+        return decision(AMPHETAMIN_BLOCKED, 0u, 0u, 1u);
+    }
+
+    /* Circuit breaker wins over demand and refill: do not dig the overload deeper. */
+    if (in->overload_score >= OVERLOAD_CUTOFF) {
+        return decision(AMPHETAMIN_COOLDOWN, 0u, 0u, 2u);
+    }
+
+    if (in->quality_score < QUALITY_FLOOR) {
+        return decision(AMPHETAMIN_BLOCKED, 0u, 0u, 3u);
+    }
+
+    demand = in->backlog + in->ambiguous_tasks;
+    if (in->backlog > UINT32_MAX - in->ambiguous_tasks) {
+        demand = UINT32_MAX;
+    }
+
+    /* Situational activation: no clock or fixed schedule is involved. */
+    if (demand == 0u && in->resource_pressure < 70u) {
+        return decision(AMPHETAMIN_STANDBY, 0u, 0u, 0u);
+    }
+
+    if (in->max_credits == 0u ||
+        (uint64_t)in->available_credits * 100u <=
+        (uint64_t)in->max_credits * REFILL_THRESHOLD_PERCENT) {
+        return decision(AMPHETAMIN_REFILL, 0u, 1u, 4u);
+    }
+
+    if (in->max_workers == 0u || in->available_credits == 0u) {
+        return decision(AMPHETAMIN_REFILL, 0u, 1u, 4u);
+    }
+
+    /* Ambiguity and resource pressure increase demand, but stay quota-bounded. */
+    demand_workers = demand;
+    if (in->resource_pressure >= 70u && demand_workers < MAX_DEMAND_WORKERS) {
+        demand_workers += 1u;
+    }
+    if (demand_workers > MAX_DEMAND_WORKERS) {
+        demand_workers = MAX_DEMAND_WORKERS;
+    }
+
+    quality_cap = (uint32_t)(((uint64_t)in->max_workers *
+                              in->quality_score) / 100u);
+    if (quality_cap == 0u) quality_cap = 1u;
+
+    budget_cap = in->available_credits;
+    upper = in->max_workers;
+    if (upper > demand_workers) upper = demand_workers;
+    if (upper > quality_cap) upper = quality_cap;
+    if (upper > budget_cap) upper = budget_cap;
+
+    if (upper == 0u) {
+        return decision(AMPHETAMIN_REFILL, 0u, 1u, 4u);
+    }
+
+    /* Uniform bounded choice. Host must supply a CSPRNG value. */
+    lower = 1u;
+    selected = lower + (in->random_u32 % (upper - lower + 1u));
+    return decision(AMPHETAMIN_BOOST, selected, 0u, 5u);
+}
