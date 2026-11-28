@@ -162,16 +162,16 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         self.db.execute(
             """INSERT INTO worker_provisioning_requests
                (provisioning_request_id, provisioner_subject, idempotency_key_hash,
-                request_digest, state, correlation_id, created_at, updated_at)
-               VALUES ('request-1', 'provisioner:a', ?, ?, 'PENDING', 'corr-1', 'now', 'now')""",
+                request_digest, state, correlation_id, created_at, updated_at, expires_at)
+               VALUES ('request-1', 'provisioner:a', ?, ?, 'PENDING', 'corr-1', 'now', 'now', 'later')""",
             ("a" * 64, "b" * 64),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
                 """INSERT INTO worker_provisioning_requests
                    (provisioning_request_id, provisioner_subject, idempotency_key_hash,
-                    request_digest, state, correlation_id, created_at, updated_at)
-                   VALUES ('request-2', 'provisioner:a', ?, ?, 'PENDING', 'corr-2', 'now', 'now')""",
+                    request_digest, state, correlation_id, created_at, updated_at, expires_at)
+                   VALUES ('request-2', 'provisioner:a', ?, ?, 'PENDING', 'corr-2', 'now', 'now', 'later')""",
                 ("a" * 64, "c" * 64),
             )
 
@@ -187,8 +187,8 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         self.db.execute(
             """INSERT INTO worker_provisioning_requests
                (provisioning_request_id, provisioner_subject, idempotency_key_hash,
-                request_digest, state, correlation_id, created_at, updated_at)
-               VALUES ('request-2', 'provisioner:b', ?, ?, 'PENDING', 'corr-2', 'now', 'now')""",
+                request_digest, state, correlation_id, created_at, updated_at, expires_at)
+               VALUES ('request-2', 'provisioner:b', ?, ?, 'PENDING', 'corr-2', 'now', 'now', 'later')""",
             ("a" * 64, "b" * 64),
         )
 
@@ -198,8 +198,8 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
             self.db.execute(
                 """INSERT INTO worker_provisioning_requests
                    (provisioning_request_id, provisioner_subject, idempotency_key_hash,
-                    request_digest, state, correlation_id, created_at, updated_at)
-                   VALUES ('request-1', 'provisioner:a', 'short', ?, 'PENDING', 'corr-1', 'now', 'now')""",
+                    request_digest, state, correlation_id, created_at, updated_at, expires_at)
+                   VALUES ('request-1', 'provisioner:a', 'short', ?, 'PENDING', 'corr-1', 'now', 'now', 'later')""",
                 ("b" * 64,),
             )
 
@@ -209,8 +209,8 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
             self.db.execute(
                 """INSERT INTO worker_provisioning_requests
                    (provisioning_request_id, provisioner_subject, idempotency_key_hash,
-                    request_digest, worker_id, state, correlation_id, created_at, updated_at)
-                   VALUES ('request-1', 'provisioner:a', ?, ?, 'missing-worker', 'COMPLETED', 'corr-1', 'now', 'now')""",
+                    request_digest, worker_id, state, correlation_id, created_at, updated_at, completed_at, expires_at)
+                   VALUES ('request-1', 'provisioner:a', ?, ?, 'missing-worker', 'COMPLETED', 'corr-1', 'now', 'now', 'now', 'later')""",
                 ("a" * 64, "b" * 64),
             )
 
