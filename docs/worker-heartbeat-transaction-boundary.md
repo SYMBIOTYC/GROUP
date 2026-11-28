@@ -148,3 +148,15 @@ References:
 The candidate URL remains `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`. The inspection client still cannot provide an origin HTTP response for that URL; reachability and explicit dashboard state remain unverified. Do not change Worker settings or deploy solely to force the route. The next safe verification is to inspect the Worker in Cloudflare Dashboard → Settings → Domains & Routes and confirm the `workers.dev` entry is enabled, then perform an origin-level HTTPS probe. Only after that should the dedicated Access app be considered; do not modify the AMPHETAMIN app or expose enrollment routes.
 
 No Cloudflare resource was changed. I0 remains BLOCKED.
+
+## I0.7 — Exact GROUP workers.dev state (read-only, 2026-11-28)
+
+The Cloudflare API's dedicated Worker Subdomain endpoint was queried for `symbiotyc-group-control-plane` using GET `/accounts/{account_id}/workers/scripts/{script_name}/subdomain`. It returned:
+
+```json
+{"enabled":false,"previews_enabled":false}
+```
+
+This is authoritative per-script state: the GROUP Worker `workers.dev` hostname is currently disabled. The candidate URL `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev` must therefore not be treated as reachable. This resolves the earlier uncertainty in I0.5/I0.6; those entries record the evidence available at their review times.
+
+No configuration was changed. Enabling `workers.dev` is a production exposure/configuration change and requires explicit owner authorization. Do not enable preview URLs. After authorization and enablement, verify the exact hostname with an origin-level HTTPS probe, then configure a dedicated default-deny Access application before any enrollment endpoint is introduced. Keep the AMPHETAMIN Access application untouched. I0 remains BLOCKED.
