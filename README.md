@@ -165,6 +165,7 @@ The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssem
 
 - Activation-state migration: `migrations/0007_amphetamin_activation_state.sql`, following current mainline migrations 0001–0006. Not applied to production.
 - Native C/WASM parity: 14 fixed vectors plus 5,000 seeded valid inputs.
+- Exact-head CI passed on `b12c9c6c`: runtime #335 (`126/126` Node, `13` C policy, `3` WASM ABI, `22` Worker Registry migration, `8` credential resolver, `6` AMPHETAMIN migration tests; local D1 0001–0007 acceptance), schema #342, and WASM ABI #30.
 - External activation producers may submit deployment events only; tick events are rejected at the HTTP boundary and reserved for the internal GROUP controller.
 - Activation state update and event application require paired D1 batch results; a migration trigger aborts event application unless the preceding state CAS changed exactly one row.
 - The principal assertion is trusted only on the private AMPHETAMIN Service Binding boundary. The live workers.dev hostname is enabled and the Access application has no policies; private-only ingress is not proven. Keep the candidate Draft/HOLD until ingress is secured and independently verified.
