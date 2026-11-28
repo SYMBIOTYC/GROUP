@@ -114,6 +114,7 @@ export async function verifyWorkerJwt(token, options = {}) {
   if (header.alg !== "ES256") reject("algorithm must be ES256");
   if (header.typ !== "JWT") reject("typ must be JWT");
   requireBoundedString(header.kid, "kid");
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(header.kid)) reject("invalid kid format");
 
   const publicKey = getPublicKey(options.publicKeys, header.kid);
   if (!publicKey || publicKey.type !== "public" ||
@@ -124,6 +125,10 @@ export async function verifyWorkerJwt(token, options = {}) {
   }
 
   const payload = decodeJsonSegment(parts[1], "payload");
+  const allowedClaims = new Set(["iss", "aud", "sub", "registration_epoch", "jti", "iat", "nbf", "exp"]);
+  if (Object.keys(payload).some((key) => !allowedClaims.has(key))) {
+    reject("unsupported Worker JWT claim");
+  }
   const signature = decodeBase64Url(parts[2], "signature");
   if (signature.length !== 64) reject("ES256 signature must be 64 bytes");
 
