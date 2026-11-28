@@ -3,13 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/*
- * Stable wasm32 ABI v1.
- *
- * JavaScript writes the input structure into amphetamin_input_ptr(), calls
- * amphetamin_eval(), then reads AmphetaminDecision at amphetamin_output_ptr().
- * The explicit assertions make compiler/layout drift a build failure.
- */
+/* Stable wasm32 ABI v1. Exported offsets and sizes are guarded at compile time. */
 _Static_assert(sizeof(AmphetaminInput) == 64u, "AMPHETAMIN ABI v1 input size changed");
 _Static_assert(offsetof(AmphetaminInput, backlog) == 0u, "ABI input.backlog offset");
 _Static_assert(offsetof(AmphetaminInput, ambiguous_tasks) == 4u, "ABI input.ambiguous_tasks offset");
@@ -26,6 +20,11 @@ _Static_assert(offsetof(AmphetaminDecision, drive_multiplier_percent) == 16u, "A
 
 static AmphetaminInput wasm_input;
 static AmphetaminDecision wasm_output;
+
+__attribute__((visibility("default")))
+uint32_t amphetamin_abi_version(void) {
+    return 1u;
+}
 
 __attribute__((visibility("default")))
 uint32_t amphetamin_input_ptr(void) {
