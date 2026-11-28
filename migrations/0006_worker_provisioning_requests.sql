@@ -26,9 +26,17 @@ CREATE TABLE IF NOT EXISTS worker_provisioning_requests (
   UNIQUE (provisioner_subject, idempotency_key_hash),
   FOREIGN KEY (worker_id) REFERENCES workers(worker_id),
   CHECK (
-    (state = 'PENDING' AND completed_at IS NULL)
+    (state = 'PENDING'
+      AND completed_at IS NULL
+      AND outcome_code IS NULL
+      AND outcome_json IS NULL)
     OR
-    (state = 'COMPLETED' AND completed_at IS NOT NULL)
+    (state = 'COMPLETED'
+      AND completed_at IS NOT NULL
+      AND outcome_code IS NOT NULL
+      AND length(outcome_code) BETWEEN 1 AND 128
+      AND outcome_json IS NOT NULL
+      AND worker_id IS NOT NULL)
   )
 );
 
@@ -50,6 +58,7 @@ WHEN NEW.provisioning_request_id IS NOT OLD.provisioning_request_id
   OR NEW.correlation_id IS NOT OLD.correlation_id
   OR NEW.created_at IS NOT OLD.created_at
   OR NEW.expires_at IS NOT OLD.expires_at
+  OR (OLD.worker_id IS NOT NULL AND NEW.worker_id IS NOT OLD.worker_id)
 BEGIN
   SELECT RAISE(ABORT, 'provisioning request claims are immutable');
 END;
