@@ -117,3 +117,14 @@ These schemas reject caller-selected tenant/project/worker identity, trust class
 ## Provisioner idempotency persistence
 
 Migration `0006_worker_provisioning_requests.sql` adds a durable ledger keyed by Provisioner subject plus a SHA-256 hash of the idempotency key. The request digest binds the key to one canonical request; a changed payload under the same key must return 409. Raw idempotency keys are not persisted. The ledger is committed atomically with Worker, challenge, audit, and outbox state; SQLite checks do not substitute for D1 transaction/failure-injection evidence.
+
+
+## I0.26.5 migration review findings
+
+The production rollout review identified three schema-level requirements that must be resolved before migrations 0004–0006 are applied:
+
+- Migration 0005 must check `workers.revoked_at IS NULL` in both heartbeat admission and snapshot-update predicates, independently of the ACTIVE/DEGRADED state enum. This aligns database fencing with the I0.26.3 credential resolver guard.
+- Migration 0004's one-unconsumed-challenge partial unique index currently includes expired challenges. The enrollment lifecycle must explicitly supersede/expire an old challenge so an expired unconsumed row cannot block a replacement.
+- Migration 0006 must protect Provisioner subject, idempotency-key hash, and request digest from mutation and enforce the intended PENDING → COMPLETED transition invariants.
+
+These are review findings, not applied fixes. Production D1 remains at migrations 0001–0003. Do not apply 0004–0006 or enable enrollment/heartbeat until corrected migrations, negative tests, CI, and a separately authorized rollout are complete. See [I0.26.5 migration rollout review](worker-heartbeat-transaction-boundary.md#i0265--production-d1-migration-rollout-review-2026-11-28).
