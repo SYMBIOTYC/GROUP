@@ -311,3 +311,14 @@ Postflight must verify:
 No down migrations are supplied or approved. Do not use destructive DROP-based rollback on production as a routine recovery method. Prefer a reviewed forward-fix for a faulty additive schema. A restore is a separate incident action requiring verified backup availability, restore semantics, acceptable data-loss window, and explicit authorization; this review does not claim that a production restore point has been tested.
 
 **Decision:** HOLD. Resolve B1–B3 in migration source and tests, run CI plus disposable D1-compatible acceptance tests, and obtain a separate production migration authorization. I0.20 secure credential provisioning remains an independent blocker. Enrollment/heartbeat and Scheduler/dispatch stay disabled.
+
+
+## I0.26.6 — migration defect corrections (2026-11-28)
+
+Implementation is present on the I0.26.6 draft branch; validation remains pending. No production D1 migration was applied.
+
+- **B1 — heartbeat revocation fencing:** both the BEFORE INSERT eligibility predicate and AFTER INSERT snapshot-update predicate in migration 0005 now require `workers.revoked_at IS NULL`. A revoked Worker cannot accept a heartbeat or advance its lease snapshot, including if its state is inconsistently ACTIVE/DEGRADED.
+- **B2 — enrollment challenge lifecycle:** migration 0004 adds `superseded_at`. The one-unconsumed-challenge unique index and expiry index now cover only rows with both `consumed_at IS NULL` and `superseded_at IS NULL`. A BEFORE INSERT trigger supersedes an existing challenge only when its `expires_at <= NEW.created_at`; the replacement operation must provide server-generated UTC `created_at`. A still-unexpired challenge continues to block a replacement. `consumed_at` retains its original meaning.
+- **B3 — Provisioner idempotency ledger:** migration 0006 requires new requests to enter as PENDING with no completion outcome. The only permitted update is one PENDING-to-COMPLETED transition; subject, idempotency-key hash, request digest, request ID, correlation ID, creation time and expiry are immutable. Completion requires a timestamp, non-empty outcome code and JSON outcome. Subsequent updates are rejected.
+
+Regression coverage for the three findings and fixture adjustments is in `tests/test_worker_registry_migration.py`. The test suite has **not yet been executed**: the available GitHub Actions query returned no workflow runs and the execution environment could not resolve github.com for a checkout. SQLite/D1 parity is therefore not claimed. Next gate: execute the complete migration tests in CI and a disposable D1-compatible database, review all results, then request separate authorization before any production rollout.
