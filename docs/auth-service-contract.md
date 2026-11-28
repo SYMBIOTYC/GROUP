@@ -77,9 +77,25 @@ GROUP validates the caller marker, bounded assertion size, principal shape, and 
 
 External AMPHETAMIN authentication remains a separate prerequisite. Staging and production dispatch remain subject to their existing approval gates.
 
-## Historical Access and Provisioner investigation record — superseded status
+## Historical pre-reverification deployment gate — superseded snapshot
 
-The following I0.18–I0.22 entries are retained as chronological investigation history from the earlier main-branch version. They are not the current GROUP ingress posture. The current status is defined by the verified deployment posture at the top of this document: GROUP workers.dev and Preview URLs disabled, no GROUP Access application returned, and AMPHETAMIN as the only observed Service Binding consumer. Historical Access-login and token-provisioning observations below must not be treated as current account state. The Provisioner runtime contract remains a design artifact, not an enabled runtime.
+The following exact tail from the prior contract revision is retained only to preserve the historical merge-base record. Its statements about GROUP workers.dev and Access are superseded by the current verified posture at the beginning of this document.
+
+- Service-binding and public-exposure configuration changes are reviewed as security-sensitive deployment changes.
+- No Worker enrollment/heartbeat route is enabled by this contract; the Worker Registry trust gates remain separate.
+
+## Deployment and verification gate
+
+Before treating GROUP as private/internal in production:
+
+1. Verify the exact external hostname from a normal unauthenticated browser/network and capture final URL, HTTP status, and whether the Cloudflare Access denial page appears. Do not share cookies or credentials.
+2. Distinguish Access denial from DNS, TLS, or origin failure; only an actual Access denial confirms request-level enforcement.
+3. Verify the Access application remains attached to the exact hostname and default-deny (`policies=[]`) until a dedicated Provisioner Service Token is securely provisioned and an exact-token policy is deliberately created.
+4. Verify `preview_urls=false` and inspect Version/Preview/Deployment URLs separately; disabling workers.dev alone does not disable them.
+5. Verify AMPHETAMIN is the sole Service Binding consumer and test missing/wrong caller marker, malformed principal, and missing scopes fail closed.
+6. Prefer restoring `workers_dev=false` once the approved internal Service Binding path is validated and public hostname access is no longer required.
+
+Cloudflare Access is now configured for GROUP, contrary to the older statement in this document; enforcement at the external request layer is still unverified. External AMPHETAMIN authentication remains a separate prerequisite.
 
 ## I0.18 — Runtime Access probe (2026-11-28)
 
