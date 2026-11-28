@@ -8,7 +8,10 @@ typedef enum {
     AMPHETAMIN_BOOST,
     AMPHETAMIN_REFILL,
     AMPHETAMIN_COOLDOWN,
-    AMPHETAMIN_BLOCKED
+    AMPHETAMIN_BLOCKED,
+    AMPHETAMIN_MAXIMUM_DRIVE,
+    AMPHETAMIN_RESOURCE_HUNT,
+    AMPHETAMIN_HARD_STOP
 } AmphetaminMode;
 
 typedef struct {
@@ -19,6 +22,7 @@ typedef struct {
     uint8_t quality_score;     /* 0..100: release quality */
     uint8_t cooldown_latched;  /* 1 while an external controller holds cooldown */
     uint8_t recovery_score;    /* 0..100: telemetry-backed recovery confidence */
+    uint8_t integrity_risk;    /* 1: trusted controller reports integrity/security risk */
     uint32_t available_credits;
     uint32_t max_credits;
     uint32_t max_workers;
@@ -29,6 +33,7 @@ typedef struct {
     AmphetaminMode mode;
     uint32_t worker_count;
     uint8_t request_refill;
+    uint8_t request_capacity;
     uint8_t reason_code;
 } AmphetaminDecision;
 
