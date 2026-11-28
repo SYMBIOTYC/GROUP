@@ -384,3 +384,10 @@ Observed account state:
 7. Separately authorize and execute the production D1 migration rollout; this stage is not that authorization.
 
 Until all criteria pass, Worker enrollment/heartbeat routes remain absent or disabled, Worker scheduling remains ineligible, and Scheduler/dispatch remain disabled. Migrations `0004–0006` remain unapplied in production. PR #19 remains draft and unmerged.
+
+
+## I0.26.10 — safe provisioning operator runbook (2026-11-28)
+
+The operator procedure is maintained in [I0.26.10 Safe Provisioning Operator Runbook](i0-26-10-safe-provisioning-operator-runbook.md). It defines the secret-capture gate, exact token-ID Access policy semantics, private Provisioner deployment constraints, metadata-only binding verification, positive/negative integration tests, and independent production D1 admission criteria.
+
+**Disposition: DOCUMENTATION READY / EXECUTION BLOCKED.** I0.20 remains blocked because no approved one-time secret capture and secure handoff interface is available. No Service Token, Access policy, secret binding, or Provisioner deployment was created. Production D1 remains HOLD; migrations 0004–0006 are not applied. This document does not authorize any of those actions.
