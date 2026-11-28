@@ -2,7 +2,7 @@
 
 **Role:** Compute Control Plane for the SYMBIOTYC Cloud federation.  
 **Protocol:** `symbiotyc.compute.v1`  
-**Status:** GROUP Worker is deployed in the primary Cloudflare production account with its dedicated EU D1 binding. AMPHETAMIN has a private Service Binding to GROUP. The GROUP workers.dev hostname is enabled with Preview URLs disabled; its dedicated Access application is attached and remains default-deny with no policies. No compute dispatch is enabled.
+**Status:** GROUP Worker is deployed in the primary Cloudflare production account with its dedicated EU D1 binding. AMPHETAMIN has a private Service Binding to GROUP. The GROUP workers.dev hostname and Preview URLs are disabled; its dedicated Access application remains default-deny with no policies. No compute dispatch is enabled.
 
 GROUP owns compute-resource coordination across `CLOUD-COMPUTE`, `CLOUD-CPU`, and `CLOUD-VPS`. It is the authority for Worker registration and eligibility, scheduling, capacity reservations, dispatch coordination, quotas, policy, lifecycle state, and audit.
 
@@ -91,7 +91,7 @@ PR #10 adds the private approval API and the D1 migration `0003_compute_approval
 - Cancel approvals require an existing non-terminal Job in the same tenant/project.
 - Approval claims are immutable; approvals cannot be deleted; audit events are append-only.
 
-**Production state (2026-11-28):** The D1 migration has been applied and recorded in `d1_migrations` alongside the existing 0001 and 0002 baseline. The table, index, and three triggers are present. The GROUP Worker source contains the new routes on `main`, but the live Worker has not yet been upgraded; the Cloudflare upload was blocked by the security layer. These endpoints are therefore not yet active in production. GROUP's repository target config sets `workers_dev=false` and `preview_urls=false`; live Cloudflare state is separate: the `workers.dev` subdomain is enabled with Preview URLs disabled and the dedicated Access app remains default-deny (`policies=[]`).
+**Production state (2026-11-28):** The D1 migration has been applied and recorded in `d1_migrations` alongside the existing 0001 and 0002 baseline. The table, index, and three triggers are present. The GROUP Worker source contains the new routes on `main`, but the live Worker has not yet been upgraded; the Cloudflare upload was blocked by the security layer. These endpoints are therefore not yet active in production. GROUP's repository target config sets `workers_dev=false` and `preview_urls=false`; live Cloudflare state was read back on 2026-11-28: the `workers.dev` subdomain and Preview URLs are disabled; the dedicated Access app remains default-deny (`policies=[]`).
 
 - `migrations/0006_worker_provisioning_requests.sql` — durable Provisioner-subject-scoped idempotency ledger; schema only, not applied to production D1.
 - `provisioner/` — isolated, quarantined Provisioner Worker scaffold; deployment manifest declares a private GROUP Service Binding, but Access verification, GROUP authorization, and deployment are not implemented.
@@ -168,5 +168,5 @@ The AMPHETAMIN C11 policy, durable tenant/project activation state, and WebAssem
 - Exact-head CI passed on `b12c9c6c`: runtime #335 (`126/126` Node, `13` C policy, `3` WASM ABI, `22` Worker Registry migration, `8` credential resolver, `6` AMPHETAMIN migration tests; local D1 0001–0007 acceptance), schema #342, and WASM ABI #30.
 - External activation producers may submit deployment events only; tick events are rejected at the HTTP boundary and reserved for the internal GROUP controller.
 - Activation state update and event application require paired D1 batch results; a migration trigger aborts event application unless the preceding state CAS changed exactly one row.
-- The principal assertion is trusted only on the private AMPHETAMIN Service Binding boundary. The live workers.dev hostname is enabled and the Access application has no policies; private-only ingress is not proven. Keep the candidate Draft/HOLD until ingress is secured and independently verified.
+- The principal assertion is an unsigned internal assertion trusted only over the private AMPHETAMIN Service Binding. A read-only Cloudflare control-plane audit on 2026-11-28 confirmed GROUP workers.dev and Preview URLs disabled, no Worker Domains or zone routes for GROUP, and AMPHETAMIN as the only script with a Service Binding to GROUP. The Access application remains default-deny with no policies. This verifies the service-binding-only ingress topology at the control-plane level; an external HTTP response was not independently observed. Keep the candidate Draft pending final review.
 - Evaluation is policy-decision only. Dispatch, provisioning, and production rollout remain disabled.
