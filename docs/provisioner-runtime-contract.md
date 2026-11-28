@@ -463,3 +463,10 @@ The owner explicitly approved (a) production D1 export to independent storage, (
 ### I0.26.13 — Independent backup destination transfer gate (2026-11-28)
 
 Dropbox was approved as an alternative independent backup destination. Capability inspection found only conversation-file upload, not URL-based server-side binary ingestion/streaming. The D1 export's temporary signed URL and SQL dump must not pass through chat or an exposed attachment workflow. No production export, Dropbox write, or restore was attempted. The disposable restore D1 remains empty; production migrations 0004–0006 remain HOLD. Resume only when an approved server-to-server Cloudflare-export-to-Dropbox transfer path is available; then verify the stored object, compute SHA-256, and rehearse import/restore against the disposable D1.
+
+
+### I0.26.14 — Backup relay integration boundary (2026-11-28)
+
+Dropbox's official API supports binary upload sessions (start/append_v2/finish) with files.content.write; background operation requires an offline OAuth refresh token. D1 export returns a one-hour signed URL and can temporarily block source queries. The connected Dropbox MCP token is not exportable and is not an acceptable relay credential.
+
+The required next component is a dedicated, isolated Cloudflare backup-relay Worker (not GROUP and not Provisioner). It must use a dedicated Dropbox app/refresh token held only in a write-only Cloudflare secret, expose only authenticated start/status operations, stream the D1 export URL into bounded upload-session chunks, finalize at a deterministic path, and verify file size/content hash plus independently computed SHA-256. No signed URL, token, or SQL bytes may enter chat, logs, or caller-visible responses. Before implementation/deployment: authorize the dedicated Dropbox app, establish secure refresh-token handoff, define relay authentication, implement retry/expiry/cleanup/audit behavior, and pass synthetic-file + disposable-D1 tests. No such app, token, secret, Worker, or endpoint has been created. Production export remains unstarted; restore target is empty; production migrations remain HOLD.
