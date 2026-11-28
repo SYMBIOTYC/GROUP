@@ -26,8 +26,9 @@ function correlationId(request) {
 }
 
 function authorize(request, scope, correlation) {
-  // GROUP is private. This assertion is trusted only when requests arrive
-  // over AMPHETAMIN's Cloudflare Service Binding. Never expose public routes.
+  // This marker and principal are unsigned assertions, not credentials.
+  // Trust them only when deployment topology guarantees Service-Binding-only ingress.
+  // The live workers.dev endpoint must remain blocked until that boundary is verified.
   if (request.headers.get("x-symbiotyc-caller") !== "amphetamin") {
     return { response: errorResponse(401, "INTERNAL_GATEWAY_REQUIRED", "Requests must originate from the AMPHETAMIN service binding.", correlation) };
   }
