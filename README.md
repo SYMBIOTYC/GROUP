@@ -91,3 +91,5 @@ PR #10 adds the private approval API and the D1 migration `0003_compute_approval
 - Approval claims are immutable; approvals cannot be deleted; audit events are append-only.
 
 **Production state (2026-11-28):** The D1 migration has been applied and recorded in `d1_migrations` alongside the existing 0001 and 0002 baseline. The table, index, and three triggers are present. The GROUP Worker source contains the new routes on `main`, but the live Worker has not yet been upgraded; the Cloudflare upload was blocked by the security layer. These endpoints are therefore not yet active in production. GROUP's repository target config sets `workers_dev=false` and `preview_urls=false`; live Cloudflare state is separate: the `workers.dev` subdomain is enabled with Preview URLs disabled and the dedicated Access app remains default-deny (`policies=[]`).
+
+- `migrations/0006_worker_provisioning_requests.sql` — durable Provisioner-subject-scoped idempotency ledger; schema only, not applied to production D1.
