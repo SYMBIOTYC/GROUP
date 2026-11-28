@@ -1,6 +1,6 @@
 # Provisioner Runtime and Enrollment Boundary v1
 
-**Status:** normative design contract; implementation blocked by I0.20/I0.21  
+**Status:** normative design contract; isolated runtime scaffold committed, trust integration blocked by I0.20/I0.21  
 **Owner:** SYMBIOTYC/GROUP · **Protocol:** `symbiotyc.compute.v1` · **Reviewed:** 2026-11-28
 
 ## 1. Scope
@@ -99,7 +99,7 @@ Add a migration-backed `worker_provisioning_requests` ledger with provisioner su
 - **I0.21:** runtime boundary audit — complete; deployment absent.
 - **I0.22:** request/proof schemas and schema tests — committed; execution not yet verified.
 - **I0.23:** D1 idempotency ledger migration and transaction tests.
-- **I0.24:** standalone Provisioner Worker and private GROUP Service Binding authorization.
+- **I0.24:** isolated Worker entrypoint and deployment manifest scaffold committed; Access JWT verification, exact-token policy, GROUP private caller authentication, and deployment remain blocked/unimplemented.
 - **I0.25:** Service Token provisioning through an explicitly supported secure workflow. I0.20's execution safety block remains in force; do not bypass it through another tool or route.
 - **I0.26:** GROUP challenge redemption and ES256 JWT issuance/verification.
 - **I0.27:** negative tests and staging acceptance.
@@ -116,3 +116,15 @@ The enrollment handler must compare the stored request digest on every key repla
 The migration is a schema artifact only. It has not been applied to production D1, and no enrollment route is enabled. SQLite schema smoke checks were executed for subject-scoped uniqueness, cross-subject isolation, hash validation, and Worker foreign-key enforcement; the repository's complete Python test module and D1 transaction/failure-injection suite have not been run.
 
 **I0.23 status:** migration and focused test cases committed; production D1 application and D1-compatible atomicity proof remain outstanding.
+
+
+## I0.24 — isolated runtime scaffold (quarantined)
+
+The repository now contains:
+- `provisioner/src/index.mjs` — isolated Worker entrypoint. It exposes a health response that reports `status=blocked` and `enrollment_enabled=false`; `POST /v1/enrollments` fails closed with `503 PROVISIONER_NOT_CONFIGURED`; all other paths return 404.
+- `provisioner/wrangler.jsonc` — distinct Worker name and entrypoint, `workers_dev=false`, `preview_urls=false`, and a declared Service Binding named `GROUP` targeting `symbiotyc-group-control-plane`. It has no D1, KV, vars, secrets, signing key, or public route declaration.
+- `tests/test_provisioner_runtime_layout.py` — static boundary checks for the isolated script, private binding declaration, absence of database/signing-key bindings, and fail-closed handler.
+
+This is a repository scaffold, not a deployed Worker. A Service Binding in a manifest is not evidence that Cloudflare has provisioned the binding. The handler intentionally does not call `env.GROUP`: GROUP currently has no internal enrollment route or independently authenticated Provisioner authorization path. The Provisioner does not yet verify the Cloudflare Access JWT or resolve an allowlisted Provisioner subject. No trust is inferred from caller-supplied headers.
+
+The runtime-layout tests were committed but not executed in this environment. No Cloudflare Worker, route, Access application/policy, Service Token, secret, or live binding was created or changed. I0.20's credential provisioning safety gate remains in force.
