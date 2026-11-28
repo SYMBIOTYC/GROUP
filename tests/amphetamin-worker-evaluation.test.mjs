@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "../src/index.mjs";
+import { readFile } from "node:fs/promises";
+import { createAmphetaminWasmEvaluator } from "../src/amphetamin-wasm-runtime.mjs";
 
 const servicePrincipal = {
   kind: "service",
@@ -78,4 +80,22 @@ test("activation evaluation route fails closed when the WASM evaluator is not bo
   }), { DB: db });
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, "POLICY_RUNTIME_UNAVAILABLE");
+});
+
+test("authenticated Worker route executes the real C policy through WebAssembly", async () => {
+  const wasmPath = process.env.AMPHETAMIN_WASM_PATH;
+  assert.ok(wasmPath, "AMPHETAMIN_WASM_PATH must be set by CI");
+  const module = await WebAssembly.compile(await readFile(wasmPath));
+  const evaluator = await createAmphetaminWasmEvaluator(module);
+  const response = await worker.fetch(new Request("https://group.test/v1/activation/evaluate", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(telemetry)
+  }), { DB: db, AMPHETAMIN_EVALUATOR: evaluator });
+  const result = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(result.decision.mode, 1);
+  assert.equal(result.decision.worker_count, 1);
+  assert.equal(result.decision.reason_code, 5);
+  assert.equal(result.activation_state.version, 0);
 });
