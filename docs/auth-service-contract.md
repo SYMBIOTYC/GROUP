@@ -76,3 +76,43 @@ GROUP validates the caller marker, bounded assertion size, principal shape, and 
 6. Do not provision credentials, create Access policies, change routes, or deploy Workers as part of this repository-only contract update.
 
 External AMPHETAMIN authentication remains a separate prerequisite. Staging and production dispatch remain subject to their existing approval gates.
+
+## Historical Access and Provisioner investigation record — superseded status
+
+The following I0.18–I0.22 entries are retained as chronological investigation history from the earlier main-branch version. They are not the current GROUP ingress posture. The current status is defined by the verified deployment posture at the top of this document: GROUP workers.dev and Preview URLs disabled, no GROUP Access application returned, and AMPHETAMIN as the only observed Service Binding consumer. Historical Access-login and token-provisioning observations below must not be treated as current account state. The Provisioner runtime contract remains a design artifact, not an enabled runtime.
+
+## I0.18 — Runtime Access probe (2026-11-28)
+
+Cloudflare Browser Rendering was used for a server-side request to the GROUP hostname. The hostname returned HTTP 302 into the configured Cloudflare Access login path, proving request interception. The rendered Access page returned HTTP 400 with: `There are no login methods available for this account. An admin must create an identity provider in the Cloudflare One dashboard.` A read-only `GET /accounts/{account_id}/access/identity_providers` returned `total_count: 0`; the GROUP Access application still has `policies=[]`.
+
+Interpretation: Access intercepts the hostname, but no Identity Provider or usable human login method is configured. The HTTP 400 is the Access login configuration error, not a GROUP origin response and not a clean 403 denial test. The prior external request-path uncertainty is closed; the next blocker is choosing and explicitly authorizing a human IdP + narrowly scoped policy or the separate Provisioner Service Token + exact-token Service Auth policy. The latter still requires approved secure one-time secret capture. No Cloudflare configuration or application code changed; AMPHETAMIN remains untouched and enrollment/heartbeat/dispatch remain disabled.
+
+
+## I0.19 — Provisioner credential storage capability (2026-11-28)
+
+Cloudflare Primary read-only inventory confirms an existing Secrets Store `default_secrets_store` with quota usage 0/100, no account Service Tokens, no Identity Providers, and no GROUP Access policies. The Cloudflare API contract marks Secrets Store secret values write-only and confirms they are never returned by the API. This provides a viable server-side handoff: create the Service Token and immediately write its one-time Client Secret into Secrets Store within the same server-side execution, returning only non-secret metadata. On persistence failure, disable/revoke the newly created token before returning.
+
+The proposed secret scope is `workers`, for a future dedicated Provisioner Worker. No Provisioner Worker or binding currently exists; binding and runtime verification remain a separate deployment step. No token, secret, policy, identity provider, or Worker configuration was created or changed in this audit. GROUP remains default-deny; AMPHETAMIN is unchanged. Machine-to-machine Provisioner auth does not require a human Identity Provider.
+
+Provisioning still requires explicit owner authorization. After approval, create one bounded-lifetime token (90 days / `2160h`), persist its secret write-only, verify metadata only, and add an Access Service Auth Allow policy matching only the returned token ID. Never emit the Client Secret in tool output, chat, logs, Git, D1, or CI.
+
+ 
+## I0.20 — Provisioner token creation blocked (2026-11-28)
+
+The owner authorized a 90-day Provisioner Service Token and write-only storage of its one-time Client Secret in Cloudflare Secrets Store. The attempted combined server-side write was blocked by the execution safety layer before the Cloudflare writes ran. A subsequent independent read-only check confirmed zero account Service Tokens, no token named `SYMBIOTYC GROUP Provisioner 90d`, zero Secrets Store secrets, and no secret named `SYMBIOTYC_GROUP_PROVISIONER_ACCESS_CLIENT_SECRET`.
+
+No credential was generated or stored; no Access policy, Worker binding, or route changed. GROUP remains default-deny, AMPHETAMIN unchanged, and enrollment/heartbeat/dispatch disabled. This was a tool-execution safety block, not a Cloudflare API rejection. Do not retry via another tool to bypass the gate. Resume only through an explicitly supported secure credential-provisioning workflow.
+
+
+## I0.21 — Provisioner runtime boundary (2026-11-28)
+
+The current GROUP `src/index.mjs` contains no Provisioner, enrollment, heartbeat, or Worker JWT issuance/verifier route. GROUP `wrangler.jsonc` declares only the D1 `DB` binding; no Secrets Store, Provisioner service, signing-key, or verifier binding is configured. The inspected deployed Worker inventory has no separate Provisioner Worker.
+
+This is an independent blocker beyond secure token handoff: there is no isolated runtime/deployment boundary to receive the Provisioner credential or exercise enrollment authority. Define a dedicated Provisioner Worker/service with its own entrypoint and manifest, exact-token Access Service Auth ingress, least-privilege GROUP binding, write-only secret binding, fixed issuer/audience, asymmetric signing, rotation/revocation procedure, and cross-boundary negative tests before implementing enrollment. Do not reuse AMPHETAMIN principal assertions or add enrollment routes to the existing GROUP Worker as a shortcut.
+
+No code or Cloudflare resources changed. I0.20's credential provisioning safety block remains in force; no alternate-tool retry is permitted. GROUP stays default-deny and all worker enrollment/heartbeat/dispatch remains disabled.
+
+
+## I0.22 — Provisioner runtime contract
+
+The isolated Provisioner runtime and enrollment boundary is now specified in [docs/provisioner-runtime-contract.md](provisioner-runtime-contract.md). Its Access Service Token authenticates only the Provisioner ingress; a dedicated private Service Binding authenticates Provisioner-to-GROUP; Worker Agents redeem a one-time challenge and receive a separate GROUP-signed ES256 JWT. The new request/proof schemas and schema-level tests are indexed in the repository README. No runtime route, secret, binding, or Access policy is enabled by this contract.
