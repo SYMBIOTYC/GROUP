@@ -114,7 +114,7 @@ export async function verifyProvisionerAssertion(request, env, {
     );
     if (!valid) return failure("PROVISIONER_ASSERTION_INVALID");
 
-    return { ok: true, subject: claims.sub, jti: claims.jti, keyId: header.kid };
+    return { ok: true, subject: claims.sub, jti: claims.jti, keyId: header.kid, requestDigest, idempotencyKeyHash, body: binding.body };
   } catch {
     return failure("PROVISIONER_ASSERTION_INVALID");
   }
