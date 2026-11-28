@@ -64,6 +64,9 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - `tests/test_worker_registry_migration.py` — SQLite migration invariants for tenant/project binding, challenge uniqueness, heartbeat sequence uniqueness and append-only audit.
 
 - [F2.3 Transactional Heartbeat blocker](docs/worker-heartbeat-transaction-boundary.md) — independent Provisioner/Worker credential authority prerequisite and atomic heartbeat contract.
+- [Provisioner Runtime and Enrollment Boundary v1](docs/provisioner-runtime-contract.md) — isolated Provisioner deployment, trust boundaries, enrollment API, one-time challenge, ES256 Worker JWT, and acceptance tests.
+- `contracts/provisioner-enrollment-request-v1.schema.json` and `contracts/worker-enrollment-proof-v1.schema.json` — strict machine-readable enrollment payloads.
+- `tests/test_provisioner_contract.py` — schema-level negative tests for caller-selected identity/trust and capacity limits.
 
 ## Deployment configuration
 
@@ -72,7 +75,7 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 
 ## Implementation status
 
-The repository includes the initial protocol schemas, Job API source core, D1 migration, private Service Binding contract, and passing Node/Python CI. The dedicated EU D1 database `symbiotyc-group-compute-state` has been provisioned and the initial migration applied and verified. The GROUP Worker `symbiotyc-group-control-plane` is deployed with the dedicated D1 binding; its `workers.dev` subdomain and preview URLs are disabled. The AMPHETAMIN Worker has a live `GROUP` Service Binding to this service. The Access-protected MCP edge exposes only the read-only `group.health` probe. An authenticated external MCP round-trip has not yet been verified. Scheduler, dispatcher, Worker agent, provider adapter, result/artifact pipeline, and production dispatch remain disabled until the end-to-end acceptance gates pass.
+The repository includes the initial protocol schemas, Job API source core, D1 migration, private Service Binding contract, and passing Node/Python CI. The dedicated EU D1 database `symbiotyc-group-compute-state` has been provisioned and the initial migration applied and verified. The GROUP Worker `symbiotyc-group-control-plane` is deployed with the dedicated D1 binding; its `workers.dev` subdomain is enabled with Preview URLs disabled and a dedicated Cloudflare Access self-hosted application attached; the Access app currently has no policies (default-deny). The AMPHETAMIN Worker has a live `GROUP` Service Binding to this service. The Access-protected MCP edge exposes only the read-only `group.health` probe. An authenticated external MCP round-trip has not yet been verified. Scheduler, dispatcher, Worker agent, provider adapter, result/artifact pipeline, and production dispatch remain disabled until the end-to-end acceptance gates pass.
 
 The dated [live deployment verification](https://github.com/SYMBIOTYC/SYMBIOTYC-CLOUD-WIKI/blob/main/Architecture/Compute-Infrastructure/Live-Deployment-Verification-2026-11-28.md) records the account-side evidence and remaining gaps. A Worker script existing in the account is not proof that the complete compute lifecycle is operational.
 
@@ -87,4 +90,4 @@ PR #10 adds the private approval API and the D1 migration `0003_compute_approval
 - Cancel approvals require an existing non-terminal Job in the same tenant/project.
 - Approval claims are immutable; approvals cannot be deleted; audit events are append-only.
 
-**Production state (2026-11-28):** The D1 migration has been applied and recorded in `d1_migrations` alongside the existing 0001 and 0002 baseline. The table, index, and three triggers are present. The GROUP Worker source contains the new routes on `main`, but the live Worker has not yet been upgraded; the Cloudflare upload was blocked by the security layer. These endpoints are therefore not yet active in production. GROUP remains private with `workers_dev=false` and `preview_urls=false`.
+**Production state (2026-11-28):** The D1 migration has been applied and recorded in `d1_migrations` alongside the existing 0001 and 0002 baseline. The table, index, and three triggers are present. The GROUP Worker source contains the new routes on `main`, but the live Worker has not yet been upgraded; the Cloudflare upload was blocked by the security layer. These endpoints are therefore not yet active in production. GROUP's repository target config sets `workers_dev=false` and `preview_urls=false`; live Cloudflare state is separate: the `workers.dev` subdomain is enabled with Preview URLs disabled and the dedicated Access app remains default-deny (`policies=[]`).
