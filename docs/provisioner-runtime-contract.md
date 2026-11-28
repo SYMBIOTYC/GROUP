@@ -155,12 +155,12 @@ Added `src/worker-jwt.mjs` with an isolated `verifyWorkerJwt()` primitive and `t
 
 The primitive enforces:
 - Compact three-part JOSE format, bounded token size, canonical base64url and JSON object segments.
-- Exact JOSE header allowlist (`alg`, `typ`, `kid)); ES256 only; rejects `none), algorithm substitution, unsupported header parameters, unknown key IDs, non-P-256/non-public/non-verification keys, and malformed 64-byte ES256 signatures.
+- Exact JOSE header allowlist (`alg`, `typ`, `kid`); ES256 only; rejects `none`,  algorithm substitution, unsupported header parameters, unknown key IDs, non-P-256/non-public/non-verification keys, and malformed 64-byte ES256 signatures.
 - Cryptographic signature verification before accepting claims.
-- Exact configured issuer and audience; required bounded subject/JTI; positive registration epoch; integer `iat`, `nbf), `exp); bounded clock skew; maximum 300-second lifetime and consistent time ordering.
+- Exact configured issuer and audience; required bounded subject/JTI; positive registration epoch; integer `iat`, `nbf`, `exp`; bounded clock skew; maximum 300-second lifetime and consistent time ordering.
 - Mandatory durable credential resolver. The resolved record must be active and match subject, JTI, registration epoch, and key ID exactly; revoked/inactive and stale-epoch records fail closed.
 
-Focused test coverage includes a valid token and negative cases for algorithm substitution, malformed JOSE, unknown `kid), invalid signature, issuer/audience mismatch, not-before/expiry/lifetime/future-issued times, malformed identity claims, revoked JTI, stale epoch, mismatched credential records, missing trust configuration/resolver, unsupported JOSE header parameters, and inconsistent time ordering.
+Focused test coverage includes a valid token and negative cases for algorithm substitution, malformed JOSE, unknown `kid`,  invalid signature, issuer/audience mismatch, not-before/expiry/lifetime/future-issued times, malformed identity claims, revoked JTI, stale epoch, mismatched credential records, missing trust configuration/resolver, unsupported JOSE header parameters, and inconsistent time ordering.
 
 **Verification:** the focused Node test file was executed in an isolated local working copy with Node 22.16.0: 13 tests passed, 0 failed. This is not a run of the full repository suite or deployed Cloudflare runtime. The test file is runnable with `node --test tests/worker-jwt.test.mjs` from the repository root. Existing Provisioner assertion verification remains a separate trust path and is not reused as a Worker credential verifier.
 
