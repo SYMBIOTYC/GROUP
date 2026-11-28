@@ -14,6 +14,8 @@ on:
       - "src/index.mjs"
       - "tests/amphetamin-wasm-runtime.test.mjs"
       - "tests/amphetamin-worker-evaluation.test.mjs"
+      - "tests/amphetamin-native-wasm-parity.test.mjs"
+      - "tests/amphetamin_native_reference.c"
       - "wrangler.jsonc"
       - ".github/workflows/amphetamin-wasm-abi.yml"
   workflow_dispatch:
@@ -40,6 +42,7 @@ jobs:
           clang --target=wasm32 -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
             -nostdlib -Isrc src/amphetamin_policy.c src/amphetamin_wasm.c \
             -Wl,--no-entry -Wl,--export-memory \
+            -Wl,--export=amphetamin_abi_version \
             -Wl,--export=amphetamin_input_ptr \
             -Wl,--export=amphetamin_output_ptr \
             -Wl,--export=amphetamin_eval \
@@ -49,10 +52,13 @@ jobs:
         env:
           AMPHETAMIN_WASM_PATH: build/amphetamin_policy.wasm
         run: node --test wasm-tests/amphetamin-wasm-abi.test.mjs
-      - name: Verify Worker WASM marshalling and route integration
+      - name: Compile native C reference evaluator for parity tests
+        run: cc -std=c11 -Wall -Wextra -Werror -pedantic -Isrc src/amphetamin_policy.c tests/amphetamin_native_reference.c -o /tmp/amphetamin-native-reference
+      - name: Verify Worker WASM marshalling, native parity, and route integration
         env:
           AMPHETAMIN_WASM_PATH: build/amphetamin_policy.wasm
-        run: node --test tests/amphetamin-wasm-runtime.test.mjs tests/amphetamin-worker-evaluation.test.mjs
+          AMPHETAMIN_NATIVE_EVALUATOR: /tmp/amphetamin-native-reference
+        run: node --test tests/amphetamin-wasm-runtime.test.mjs tests/amphetamin-native-wasm-parity.test.mjs tests/amphetamin-worker-evaluation.test.mjs
       - name: Verify Wrangler Worker bundle with the compiled WASM module
         run: npx --yes wrangler@latest deploy --dry-run --outdir=dist
       - name: Upload verified wasm32 policy artifact

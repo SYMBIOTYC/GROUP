@@ -5,6 +5,13 @@ import { readFile } from "node:fs/promises";
 const wasmPath = process.env.AMPHETAMIN_WASM_PATH;
 if (!wasmPath) throw new Error("AMPHETAMIN_WASM_PATH must point to the compiled wasm32 module");
 
+test("wasm32 ABI v1 publishes an explicit version before memory is accessed", async () => {
+  const bytes = await readFile(wasmPath);
+  const { instance } = await WebAssembly.instantiate(bytes);
+  assert.equal(typeof instance.exports.amphetamin_abi_version, "function");
+  assert.equal(instance.exports.amphetamin_abi_version(), 1);
+});
+
 test("wasm32 ABI v1 evaluates a C policy input and returns the expected decision", async () => {
   const bytes = await readFile(wasmPath);
   const { instance } = await WebAssembly.instantiate(bytes);
@@ -17,8 +24,6 @@ test("wasm32 ABI v1 evaluates a C policy input and returns the expected decision
   const input = amphetamin_input_ptr();
   const output = amphetamin_output_ptr();
   const view = new DataView(memory.buffer);
-
-  // ABI v1 AmphetaminInput (64 bytes), little-endian wasm32 layout.
   view.setUint32(input + 0, 3, true);
   view.setUint32(input + 4, 0, true);
   view.setUint8(input + 8, 0);

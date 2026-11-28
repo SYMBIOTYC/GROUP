@@ -28,14 +28,18 @@ jobs:
           clang --target=wasm32 -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
             -nostdlib -Isrc src/amphetamin_policy.c src/amphetamin_wasm.c \
             -Wl,--no-entry -Wl,--export-memory \
+            -Wl,--export=amphetamin_abi_version \
             -Wl,--export=amphetamin_input_ptr \
             -Wl,--export=amphetamin_output_ptr \
             -Wl,--export=amphetamin_eval \
             -Wl,--initial-memory=131072 -Wl,--max-memory=131072 \
             -o build/amphetamin_policy.wasm
-      - name: Run runtime, controller, WASM adapter, and Worker route tests
+      - name: Compile native C reference evaluator for parity tests
+        run: cc -std=c11 -Wall -Wextra -Werror -pedantic -Isrc src/amphetamin_policy.c tests/amphetamin_native_reference.c -o /tmp/amphetamin-native-reference
+      - name: Run runtime, controller, WASM adapter, parity, and Worker route tests
         env:
           AMPHETAMIN_WASM_PATH: build/amphetamin_policy.wasm
+          AMPHETAMIN_NATIVE_EVALUATOR: /tmp/amphetamin-native-reference
         run: node --test tests/*.test.mjs
       - name: Compile and run AMPHETAMIN C policy tests
         run: |
