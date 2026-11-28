@@ -105,3 +105,12 @@ Provisioning still requires explicit owner authorization. After approval, create
 The owner authorized a 90-day Provisioner Service Token and write-only storage of its one-time Client Secret in Cloudflare Secrets Store. The attempted combined server-side write was blocked by the execution safety layer before the Cloudflare writes ran. A subsequent independent read-only check confirmed zero account Service Tokens, no token named `SYMBIOTYC GROUP Provisioner 90d`, zero Secrets Store secrets, and no secret named `SYMBIOTYC_GROUP_PROVISIONER_ACCESS_CLIENT_SECRET`.
 
 No credential was generated or stored; no Access policy, Worker binding, or route changed. GROUP remains default-deny, AMPHETAMIN unchanged, and enrollment/heartbeat/dispatch disabled. This was a tool-execution safety block, not a Cloudflare API rejection. Do not retry via another tool to bypass the gate. Resume only through an explicitly supported secure credential-provisioning workflow.
+
+
+## I0.21 — Provisioner runtime boundary (2026-11-28)
+
+The current GROUP `src/index.mjs` contains no Provisioner, enrollment, heartbeat, or Worker JWT issuance/verifier route. GROUP `wrangler.jsonc` declares only the D1 `DB` binding; no Secrets Store, Provisioner service, signing-key, or verifier binding is configured. The inspected deployed Worker inventory has no separate Provisioner Worker.
+
+This is an independent blocker beyond secure token handoff: there is no isolated runtime/deployment boundary to receive the Provisioner credential or exercise enrollment authority. Define a dedicated Provisioner Worker/service with its own entrypoint and manifest, exact-token Access Service Auth ingress, least-privilege GROUP binding, write-only secret binding, fixed issuer/audience, asymmetric signing, rotation/revocation procedure, and cross-boundary negative tests before implementing enrollment. Do not reuse AMPHETAMIN principal assertions or add enrollment routes to the existing GROUP Worker as a shortcut.
+
+No code or Cloudflare resources changed. I0.20's credential provisioning safety block remains in force; no alternate-tool retry is permitted. GROUP stays default-deny and all worker enrollment/heartbeat/dispatch remains disabled.
