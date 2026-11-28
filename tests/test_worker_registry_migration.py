@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / "migrations" / "0001_compute_core.sql"
 REGISTRY = ROOT / "migrations" / "0004_worker_registry.sql"
+FENCING = ROOT / "migrations" / "0005_worker_heartbeat_fencing.sql"
 
 
 class WorkerRegistryMigrationTests(unittest.TestCase):
@@ -14,6 +15,7 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
         self.db.execute("PRAGMA foreign_keys = ON")
         self.db.executescript(CORE.read_text(encoding="utf-8"))
         self.db.executescript(REGISTRY.read_text(encoding="utf-8"))
+        self.db.executescript(FENCING.read_text(encoding="utf-8"))
         self.db.execute(
             "INSERT INTO project_quotas VALUES (?, ?, 0, 10, 8000, 8192, 3600, ?)",
             ("tenant-a", "project-a", "2026-11-28T00:00:00Z"),
@@ -84,6 +86,7 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
             )
 
     def test_heartbeat_sequence_is_unique_per_worker_and_append_only(self):
+        self.db.execute("UPDATE workers SET state='ACTIVE' WHERE worker_id='worker-a'")
         self.db.execute(
             """INSERT INTO worker_heartbeats VALUES
             ('worker-a', 1, 1, 'healthy', 0, 0, 0, 'now', 'later')"""
