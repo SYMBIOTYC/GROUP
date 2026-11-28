@@ -64,7 +64,8 @@ The normative architecture, execution lifecycle, API semantics, security model, 
 - `tests/test_worker_registry_migration.py` — SQLite migration invariants for tenant/project binding, challenge uniqueness, heartbeat sequence uniqueness and append-only audit.
 
 - [F2.3 Transactional Heartbeat blocker](docs/worker-heartbeat-transaction-boundary.md) — independent Provisioner/Worker credential authority prerequisite and atomic heartbeat contract.
-- [Provisioner Runtime and Enrollment Boundary v1](docs/provisioner-runtime-contract.md) — isolated Provisioner deployment, trust boundaries, enrollment API, one-time challenge, ES256 Worker JWT, and acceptance tests.
+- [Provisioner Runtime and Enrollment Boundary v1](docs/provisioner-runtime-contract.md)
+- [I0.26.10 Safe Provisioning Operator Runbook](docs/i0-26-10-safe-provisioning-operator-runbook.md) — gated Service Token, Access policy, private deployment, metadata-only secret verification, integration tests, and separate production D1 admission. — isolated Provisioner deployment, trust boundaries, enrollment API, one-time challenge, ES256 Worker JWT, and acceptance tests.
 - `contracts/provisioner-enrollment-request-v1.schema.json` and `contracts/worker-enrollment-proof-v1.schema.json` — strict machine-readable enrollment payloads.
 - `tests/test_provisioner_contract.py` — schema-level negative tests for caller-selected identity/trust and capacity limits.
 
