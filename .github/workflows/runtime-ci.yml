@@ -20,3 +20,7 @@ jobs:
           node-version: "22"
       - name: Run runtime unit tests
         run: node --test tests/*.test.mjs
+      - name: Compile and run AMPHETAMIN C policy tests
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pedantic -Isrc src/amphetamin_policy.c tests/amphetamin_policy_test.c -o /tmp/amphetamin-policy-test
+          /tmp/amphetamin-policy-test

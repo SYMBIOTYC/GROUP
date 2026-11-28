@@ -1,5 +1,6 @@
 import { canonicalJson, sha256Hex, validateJobIntent } from "./job-intent.mjs";
 import { createApproval, consumeApproval } from "./approvals.mjs";
+import { applyActivationEvent, getActivationState } from "./amphetamin-state.mjs";
 
 const SERVICE_NAME = "symbiotyc-group-control-plane";
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -103,6 +104,52 @@ function parseJobRow(row) {
     deadline_at: row.deadline_at,
     correlation_id: row.correlation_id
   };
+}
+
+
+async function activationStateRoute(request, env, principal, correlation, eventId = null) {
+  if (principal.kind !== "service") {
+    return errorResponse(403, "SERVICE_PRINCIPAL_REQUIRED", "AMPHETAMIN activation state is writable/readable only by an authenticated service principal.", correlation);
+  }
+  try {
+    if (eventId === null) {
+      const dbError = databaseUnavailable(env, correlation);
+      if (dbError) return dbError;
+      const state = await getActivationState(env.DB, principal.tenant_id, principal.project_id);
+      return jsonResponse(200, state);
+    }
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      return errorResponse(415, "UNSUPPORTED_MEDIA_TYPE", "Activation events must use application/json.", correlation);
+    }
+    let body;
+    try {
+      body = JSON.parse(await readTextLimited(request, 4096));
+    } catch {
+      return errorResponse(400, "INVALID_JSON", "Activation event must contain valid JSON within 4 KiB.", correlation);
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body) ||
+        Object.keys(body).some((key) => !["event_id", "event_type"].includes(key)) ||
+        typeof body.event_id !== "string" ||
+        !["deployment", "tick"].includes(body.event_type)) {
+      return errorResponse(422, "INVALID_ACTIVATION_EVENT", "event_id and event_type (deployment or tick) are required; timestamps are assigned by GROUP.", correlation);
+    }
+    const dbError = databaseUnavailable(env, correlation);
+    if (dbError) return dbError;
+    const state = await applyActivationEvent(
+      env.DB, principal.tenant_id, principal.project_id, body.event_id, body.event_type
+    );
+    return jsonResponse(200, state);
+  } catch (error) {
+    if (error?.code === "ACTIVATION_EVENT_CONFLICT") {
+      return errorResponse(409, error.code, error.message, correlation);
+    }
+    if (error instanceof TypeError) {
+      return errorResponse(422, "INVALID_ACTIVATION_EVENT", error.message, correlation);
+    }
+    return errorResponse(503, error?.code || "ACTIVATION_STATE_UNAVAILABLE",
+      "AMPHETAMIN activation state could not be durably updated.", correlation);
+  }
 }
 
 async function createJob(request, env, principal, correlation) {
@@ -350,6 +397,19 @@ export default {
         protocol: "symbiotyc.compute.v1",
         dispatch_enabled: false
       });
+    }
+
+
+    if (request.method === "GET" && url.pathname === "/v1/activation/state") {
+      const auth = authorize(request, "compute:activation:read", correlation);
+      if (auth.response) return auth.response;
+      return activationStateRoute(request, env, auth.principal, correlation);
+    }
+
+    if (request.method === "POST" && url.pathname === "/v1/activation/events") {
+      const auth = authorize(request, "compute:activation:write", correlation);
+      if (auth.response) return auth.response;
+      return activationStateRoute(request, env, auth.principal, correlation, "event");
     }
 
     if (request.method === "GET" && url.pathname === "/v1/capabilities") {
