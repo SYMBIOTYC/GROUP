@@ -42,4 +42,4 @@ jobs:
       - name: Verify wasm32 ABI round-trip in Node.js
         env:
           AMPHETAMIN_WASM_PATH: build/amphetamin_policy.wasm
-        run: node --test tests/amphetamin-wasm-abi.test.mjs
+        run: node --test wasm-tests/amphetamin-wasm-abi.test.mjs
