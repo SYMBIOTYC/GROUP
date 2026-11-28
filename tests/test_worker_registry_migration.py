@@ -285,7 +285,7 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
             )
         self.db.execute(
             """UPDATE worker_provisioning_requests
-               SET state='COMPLETED', outcome_code='ENROLLED', outcome_json='{}',
+               SET state='COMPLETED', worker_id='worker-a', outcome_code='ENROLLED', outcome_json='{}',
                    completed_at='done', updated_at='done'
                WHERE provisioning_request_id='request-immutable'"""
         )
@@ -295,6 +295,56 @@ class WorkerRegistryMigrationTests(unittest.TestCase):
                    SET request_digest=?, updated_at='again'
                    WHERE provisioning_request_id='request-immutable'""",
                 ("d" * 64,),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_provisioning_requests SET worker_id=NULL WHERE provisioning_request_id='request-immutable'"
+            )
+
+
+    def test_superseded_challenge_cannot_be_reopened_or_rebound(self):
+        self.db.execute(
+            """INSERT INTO worker_enrollment_challenges
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, created_at)
+            VALUES ('challenge-terminal', 'worker-a', ?, 'provisioner:test',
+                    '2026-11-28T10:00:00Z', '2026-11-28T09:00:00Z')""",
+            ("1" * 64,),
+        )
+        self.db.execute(
+            """INSERT INTO worker_enrollment_challenges
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, created_at)
+            VALUES ('challenge-terminal-replacement', 'worker-a', ?, 'provisioner:test',
+                    '2026-11-28T12:00:00Z', '2026-11-28T11:00:00Z')""",
+            ("2" * 64,),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_enrollment_challenges SET superseded_at=NULL WHERE challenge_id='challenge-terminal'"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_enrollment_challenges SET challenge_hash=? WHERE challenge_id='challenge-terminal'",
+                ("3" * 64,),
+            )
+
+    def test_consumed_challenge_cannot_be_reopened_or_superseded(self):
+        self.db.execute(
+            """INSERT INTO worker_enrollment_challenges
+            (challenge_id, worker_id, challenge_hash, provisioner_subject, expires_at, created_at)
+            VALUES ('challenge-consumed', 'worker-a', ?, 'provisioner:test',
+                    '2099-01-01T00:00:00Z', '2026-11-28T09:00:00Z')""",
+            ("4" * 64,),
+        )
+        self.db.execute(
+            "UPDATE worker_enrollment_challenges SET consumed_at='2026-11-28T09:30:00Z' WHERE challenge_id='challenge-consumed'"
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_enrollment_challenges SET consumed_at=NULL WHERE challenge_id='challenge-consumed'"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "UPDATE worker_enrollment_challenges SET superseded_at='2026-11-28T10:00:00Z' WHERE challenge_id='challenge-consumed'"
             )
 
 if __name__ == "__main__":
