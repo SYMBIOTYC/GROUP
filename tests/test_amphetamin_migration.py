@@ -70,6 +70,91 @@ class AmphetaminActivationMigrationTests(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("DELETE FROM amphetamin_activation_events WHERE event_id = 'deploy-0001'")
 
+
+    def test_state_version_and_event_application_are_atomic_and_idempotent(self):
+        now = "2026-11-28T10:00:00.000Z"
+        self.db.execute(
+            "INSERT INTO amphetamin_activation_state (tenant_id, project_id, updated_at) VALUES (?, ?, ?)",
+            ("tenant-a", "project-a", now),
+        )
+        self.db.execute(
+            "INSERT INTO amphetamin_activation_events "
+            "(tenant_id, project_id, event_id, event_type, occurred_at) VALUES (?, ?, ?, ?, ?)",
+            ("tenant-a", "project-a", "deploy-0001", "deployment", now),
+        )
+        update_state = (
+            "UPDATE amphetamin_activation_state SET activation_remaining_minutes = ?, "
+            "deployment_streak = ?, burnout_score = ?, updated_at = ?, version = version + 1 "
+            "WHERE tenant_id = ? AND project_id = ? AND version = ? AND EXISTS "
+            "(SELECT 1 FROM amphetamin_activation_events WHERE tenant_id = ? AND project_id = ? "
+            "AND event_id = ? AND applied_at IS NULL)"
+        )
+        mark_event = (
+            "UPDATE amphetamin_activation_events SET applied_at = ? WHERE tenant_id = ? "
+            "AND project_id = ? AND event_id = ? AND applied_at IS NULL AND changes() = 1"
+        )
+        with self.db:
+            self.db.execute(
+                update_state,
+                (180, 1, 15, now, "tenant-a", "project-a", 0,
+                 "tenant-a", "project-a", "deploy-0001"),
+            )
+            self.db.execute(mark_event, (now, "tenant-a", "project-a", "deploy-0001"))
+        state = self.db.execute(
+            "SELECT activation_remaining_minutes, deployment_streak, burnout_score, version "
+            "FROM amphetamin_activation_state WHERE tenant_id = ? AND project_id = ?",
+            ("tenant-a", "project-a"),
+        ).fetchone()
+        self.assertEqual(state, (180, 1, 15, 1))
+
+        with self.db:
+            self.db.execute(
+                update_state,
+                (360, 2, 30, now, "tenant-a", "project-a", 1,
+                 "tenant-a", "project-a", "deploy-0001"),
+            )
+            self.db.execute(mark_event, (now, "tenant-a", "project-a", "deploy-0001"))
+        replayed = self.db.execute(
+            "SELECT activation_remaining_minutes, deployment_streak, burnout_score, version "
+            "FROM amphetamin_activation_state WHERE tenant_id = ? AND project_id = ?",
+            ("tenant-a", "project-a"),
+        ).fetchone()
+        self.assertEqual(replayed, state)
+
+    def test_optimistic_version_conflict_does_not_mark_event_applied(self):
+        now = "2026-11-28T10:00:00.000Z"
+        self.db.execute(
+            "INSERT INTO amphetamin_activation_state (tenant_id, project_id, version, updated_at) "
+            "VALUES (?, ?, 2, ?)",
+            ("tenant-a", "project-a", now),
+        )
+        self.db.execute(
+            "INSERT INTO amphetamin_activation_events "
+            "(tenant_id, project_id, event_id, event_type, occurred_at) VALUES (?, ?, ?, ?, ?)",
+            ("tenant-a", "project-a", "deploy-0002", "deployment", now),
+        )
+        self.db.execute(
+            "UPDATE amphetamin_activation_state SET version = version + 1 "
+            "WHERE tenant_id = ? AND project_id = ?",
+            ("tenant-a", "project-a"),
+        )
+        self.db.execute(
+            "UPDATE amphetamin_activation_state SET activation_remaining_minutes = 180 "
+            "WHERE tenant_id = ? AND project_id = ? AND version = 2 AND EXISTS "
+            "(SELECT 1 FROM amphetamin_activation_events WHERE event_id = ? AND applied_at IS NULL)",
+            ("tenant-a", "project-a", "deploy-0002"),
+        )
+        self.db.execute(
+            "UPDATE amphetamin_activation_events SET applied_at = ? WHERE event_id = ? "
+            "AND applied_at IS NULL AND changes() = 1",
+            (now, "deploy-0002"),
+        )
+        row = self.db.execute(
+            "SELECT applied_at FROM amphetamin_activation_events WHERE event_id = ?",
+            ("deploy-0002",),
+        ).fetchone()
+        self.assertEqual(row, (None,))
+
     def test_state_constraints_prevent_activation_and_burnout_overflow(self):
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
