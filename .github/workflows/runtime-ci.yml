@@ -3,7 +3,15 @@ name: GROUP runtime unit tests
 on:
   push:
     branches: [main, i0-26-6-migration-defect-fixes]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/runtime-ci.yml"
   pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/runtime-ci.yml"
   workflow_dispatch:
 
 permissions:

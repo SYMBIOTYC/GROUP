@@ -3,6 +3,11 @@ name: GROUP D1 local migration compatibility
 on:
   push:
     branches: [i0-26-6-migration-defect-fixes]
+    paths:
+      - "migrations/**"
+      - "tests/d1/**"
+      - "wrangler.d1-*.jsonc"
+      - ".github/workflows/d1-migration-compat.yml"
   pull_request:
     paths:
       - "migrations/**"

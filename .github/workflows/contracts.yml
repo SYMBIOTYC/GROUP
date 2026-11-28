@@ -3,7 +3,19 @@ name: Compute protocol contracts
 on:
   push:
     branches: [main, i0-26-6-migration-defect-fixes]
+    paths:
+      - "contracts/**"
+      - "tests/**"
+      - "migrations/**"
+      - "requirements-dev.txt"
+      - ".github/workflows/contracts.yml"
   pull_request:
+    paths:
+      - "contracts/**"
+      - "tests/**"
+      - "migrations/**"
+      - "requirements-dev.txt"
+      - ".github/workflows/contracts.yml"
   workflow_dispatch:
 
 permissions:
