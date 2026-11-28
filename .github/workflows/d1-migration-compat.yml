@@ -1,0 +1,93 @@
+name: GROUP D1 local migration compatibility
+
+on:
+  pull_request:
+    paths:
+      - "migrations/**"
+      - "tests/d1/**"
+      - "wrangler.d1-test.jsonc"
+      - ".github/workflows/d1-migration-compat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  d1-local-migrations:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Apply all migrations to isolated local D1
+        run: |
+          npx --yes wrangler@4 d1 migrations apply DB --local --yes \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test
+      - name: Seed isolated D1 fixtures
+        run: |
+          npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/seed.sql
+      - name: B1 — revoked Worker heartbeat is rejected atomically
+        shell: bash
+        run: |
+          set -euo pipefail
+          if output=$(npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/reject-revoked-heartbeat.sql 2>&1); then
+            echo "Expected revoked Worker heartbeat rejection, but SQL succeeded"
+            exit 1
+          fi
+          echo "$output"
+          echo "$output" | grep -q "heartbeat rejected"
+          npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/assert-revoked-heartbeat-rollback.sql
+      - name: B2 — expired challenge supersession and live-slot fencing
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/replace-expired-challenge.sql
+          if output=$(npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/reject-live-challenge-replacement.sql 2>&1); then
+            echo "Expected live challenge to retain its unique slot, but SQL succeeded"
+            exit 1
+          fi
+          echo "$output"
+          echo "$output" | grep -q "UNIQUE constraint failed"
+      - name: B3 — immutable claims and one-way completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          if output=$(npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/reject-idempotency-claim-mutation.sql 2>&1); then
+            echo "Expected immutable claim mutation to fail, but SQL succeeded"
+            exit 1
+          fi
+          echo "$output"
+          echo "$output" | grep -q "claims are immutable"
+          npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/complete-provisioning-request.sql
+          if output=$(npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/reject-completed-request-reopen.sql 2>&1); then
+            echo "Expected completed request to be immutable, but SQL succeeded"
+            exit 1
+          fi
+          echo "$output"
+          echo "$output" | grep -q "claims are immutable"
+          npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --file tests/d1/assert-provisioning-request-completed.sql
+      - name: Verify migration ledger and foreign-key integrity
+        run: |
+          npx --yes wrangler@4 d1 execute DB --local \
+            --config wrangler.d1-test.jsonc --persist-to .wrangler/d1-test \
+            --command "SELECT COUNT(*) AS migration_count FROM d1_migrations; PRAGMA foreign_key_check;"
