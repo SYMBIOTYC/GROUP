@@ -9,7 +9,7 @@ const CAPACITY_KEYS = new Set([
   "cpu_millis", "memory_mib", "ephemeral_disk_mib", "max_concurrency"
 ]);
 
-function hasExactKeys(value, allowed, required = allowed) {
+function hasExactKeys(value, allowed, required = [...allowed]) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const keys = Object.keys(value);
   return keys.every((key) => allowed.has(key)) &&
