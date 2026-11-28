@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { transitionActivationState } from "../src/amphetamin-state.mjs";
+import { applyActivationEvent, transitionActivationState } from "../src/amphetamin-state.mjs";
 
 const policy = {
   deployment_extension_minutes: 180,
@@ -75,4 +75,38 @@ test("rejects invalid state, event types, timestamps, and policy", () => {
   assert.throws(() => transitionActivationState(state, {
     type: "other", occurred_at: "2026-11-28T08:01:00.000Z"
   }, policy), /event.type/);
+});
+
+test("activation batch rejects an event mark when the state CAS did not update", async () => {
+  const state = {
+    activation_remaining_minutes: 0,
+    deployment_streak: 0,
+    burnout_score: 0,
+    recovery_remainder_minutes: 0,
+    updated_at: "2026-11-28T10:00:00.000Z",
+    version: 0
+  };
+  const event = {
+    event_type: "deployment",
+    occurred_at: "2026-11-28T10:00:00.000Z",
+    applied_at: null
+  };
+  const db = {
+    prepare(sql) {
+      return {
+        bind() {
+          return {
+            run: async () => ({ meta: { changes: 1 } }),
+            first: async () => sql.includes("amphetamin_activation_events") ? event : state
+          };
+        }
+      };
+    },
+    batch: async () => [{ meta: { changes: 1 } }, { meta: { changes: 0 } }]
+  };
+
+  await assert.rejects(
+    () => applyActivationEvent(db, "tenant-a", "project-a", "deploy-event-0001", "deployment"),
+    error => error.code === "ACTIVATION_EVENT_COMMIT_INCONSISTENT"
+  );
 });
