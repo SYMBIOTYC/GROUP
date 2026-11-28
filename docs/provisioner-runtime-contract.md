@@ -230,7 +230,11 @@ The helper currently enforces the quarantined enrollment request boundary:
 
 The helper reads `request.clone()`, so the original body stream remains available to a future handler. The verifier ignores caller-supplied digest options and digest headers; only the recomputed values are compared with JWT claims `rqh` and `ikh`. The tests include deliberately forged digest headers, changed method/path/body, query strings, changed idempotency keys, malformed bodies and content types, and signer-to-verifier interoperability.
 
-**Verification status:** the new tests are committed, but a GitHub Actions run for this exact change has not yet been confirmed. Do not treat this step as CI-green until the runtime workflow for the resulting commit completes successfully.
+**Verification:** GitHub Actions on commit `001473f90f11d79b71accb411a456a39d7c5785e` completed successfully:
+- Runtime unit tests, run #227 / ID `46154700766`: 85 passed, 0 failed.
+- Compute protocol contracts, run #233 / ID `46154700753`: passed, including JSON syntax validation and schema conformance.
+
+The first RED/GREEN iterations caught and corrected two test defects: a body mutation must produce a different digest (not make the parser reject a valid request), and the existing SQLite resolver test's SQL-extraction regex was over-escaped. The corrected code and tests are what the successful workflows exercised.
 
 **Security/deployment boundary:** this is still a non-routed verification primitive. No enrollment route calls it; the helper does not mutate D1 or consume the request body seen by a future handler. No Service Token, secret, Access policy, binding, D1 migration, Worker deployment, or Scheduler/dispatch setting changed. I0.20 secure credential provisioning remains blocked; enrollment and heartbeat remain disabled.
 
