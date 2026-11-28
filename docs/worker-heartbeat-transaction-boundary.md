@@ -191,3 +191,20 @@ The owner explicitly authorized creation of a dedicated Cloudflare Access applic
 Cloudflare's Access policy model is default-deny: with no Allow policy attached, the application grants no access. The app list was re-read after creation and contains exactly the dedicated GROUP app plus the pre-existing AMPHETAMIN app. The AMPHETAMIN app ID `eef48749-8655-44cf-b807-84b755fbfe22`, its owner-email Allow policy, and its OAuth/DCR configuration were unchanged.
 
 This closes the unauthenticated Access path at the hostname layer; it does **not** implement Provisioner authentication, Worker credentials, enrollment, or heartbeat. No Service Token, signing secret, Worker binding, route, or application code was created or changed. I0 remains BLOCKED; registration/heartbeat routes remain absent and Scheduler/dispatch remain disabled. Origin-level end-to-end denial has not yet been independently probed from an external client.
+
+
+## I0.10 — Per-script workers.dev read-back (2026-11-28)
+
+A direct read-only call to Cloudflare's per-script endpoint, GET `/accounts/{account_id}/workers/scripts/{script_name}/subdomain`, returned:
+
+```json
+{"enabled":true,"previews_enabled":false}
+```
+
+This confirms the GROUP Worker `symbiotyc-group-control-plane` currently has its `workers.dev` hostname enabled and Preview URLs disabled. It supersedes the historical `enabled: false` snapshot in I0.7; I0.7 records the state observed at that earlier time, before the subsequent authorized enablement in I0.8. The current hostname is `https://symbiotyc-group-control-plane.vladyslavchaplygin.workers.dev`.
+
+An HTTPS open attempt through the available external inspection client again returned an internal inspection error and no origin HTTP status. Therefore the Cloudflare configuration state is confirmed, but DNS resolution, origin reachability, and the response served by GROUP remain unverified. Do not interpret the inspection-client error as a 4xx/5xx response or as proof that the hostname is down.
+
+The dedicated Access application created in I0.9 remains present with no attached policies (default-deny); no Access policy, Service Token, Worker secret, route, application code, or enrollment/heartbeat endpoint was changed in this operation. AMPHETAMIN configuration remains untouched. I0 remains BLOCKED; no Worker is schedulable and Scheduler/dispatch remain disabled.
+
+Next gate: obtain a genuine origin-level HTTPS response and verify Access denial from an external client. Only then proceed to a narrowly scoped Service Auth policy and secure Provisioner credential provisioning. Never add an Allow policy before the credential is ready, and do not expose enrollment/heartbeat routes.
