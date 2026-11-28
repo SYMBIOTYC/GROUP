@@ -98,3 +98,17 @@ The Cloudflare API schema was inspected read-only before provisioning:
 ### Execution guard
 
 This runbook is design-only. Creating the Access app, policy, token, or Worker secret changes account security posture and creates credentials. Those actions require explicit approval and secure credential handling. Until those steps are completed and verified, I0 remains blocked and Worker registration/heartbeat remain unavailable.
+
+
+## I0.3 — Enrollment hostname prerequisite audit
+
+A further read-only audit of the Cloudflare Primary account found **zero active or pending zones** associated with that account. The inspected GROUP and AMPHETAMIN Worker settings also expose no custom-domain or route binding in their current settings snapshots; GROUP remains bound only to D1 `DB`, while AMPHETAMIN has its existing private GROUP Service Binding and runtime bindings.
+
+Consequences:
+
+- There is no verified customer-controlled zone in this account on which to reserve a dedicated enrollment hostname or attach a zone-scoped Worker route.
+- Do not guess a hostname, create a zone, or place the Access app on the existing AMPHETAMIN hostname.
+- Before Access application creation, the owner must identify an already-controlled domain/zone and approve a dedicated hostname (for example, `provisioner.<approved-zone>`), or explicitly authorize adding a domain/zone and completing its DNS onboarding.
+- Until then, the Access application domain and Worker route target are unresolved. No Cloudflare resources were changed.
+
+This is an additional I0 prerequisite, not a reason to expose the current GROUP Worker publicly.
