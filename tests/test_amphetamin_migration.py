@@ -50,14 +50,24 @@ class AmphetaminActivationMigrationTests(unittest.TestCase):
         )
 
     def test_event_identity_is_immutable_and_applied_event_cannot_be_reapplied(self):
+        now = "2026-11-28T10:00:00.000Z"
+        self.db.execute(
+            "INSERT INTO amphetamin_activation_state (tenant_id, project_id, updated_at) VALUES (?, ?, ?)",
+            ("tenant-a", "project-a", now),
+        )
         self.db.execute(
             "INSERT INTO amphetamin_activation_events VALUES (?, ?, ?, ?, ?, NULL)",
-            ("tenant-a", "project-a", "deploy-0001", "deployment", "2026-11-28T10:00:00.000Z"),
+            ("tenant-a", "project-a", "deploy-0001", "deployment", now),
         )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute(
                 "UPDATE amphetamin_activation_events SET event_type = 'tick' WHERE event_id = 'deploy-0001'"
             )
+        self.db.execute(
+            "UPDATE amphetamin_activation_state SET version = version + 1 "
+            "WHERE tenant_id = ? AND project_id = ?",
+            ("tenant-a", "project-a"),
+        )
         self.db.execute(
             "UPDATE amphetamin_activation_events SET applied_at = ? WHERE event_id = ?",
             ("2026-11-28T10:00:01.000Z", "deploy-0001"),
@@ -69,7 +79,6 @@ class AmphetaminActivationMigrationTests(unittest.TestCase):
             )
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("DELETE FROM amphetamin_activation_events WHERE event_id = 'deploy-0001'")
-
 
     def test_state_version_and_event_application_are_atomic_and_idempotent(self):
         now = "2026-11-28T10:00:00.000Z"
@@ -133,6 +142,7 @@ class AmphetaminActivationMigrationTests(unittest.TestCase):
             "(tenant_id, project_id, event_id, event_type, occurred_at) VALUES (?, ?, ?, ?, ?)",
             ("tenant-a", "project-a", "deploy-0002", "deployment", now),
         )
+        self.db.commit()
         with self.assertRaises(sqlite3.IntegrityError):
             with self.db:
                 self.db.execute(
