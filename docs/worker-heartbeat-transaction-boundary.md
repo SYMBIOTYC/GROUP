@@ -454,3 +454,17 @@ The Provisioner assertion signing key is distinct from the Cloudflare Access Ser
 **Implementation boundary:** this commit adds the verifier module and focused Node tests only. The internal enrollment HTTP route does not yet call it; GROUP's runtime trust variables/public key set are not configured; the Provisioner signing key is not provisioned; the isolated Worker is not deployed and its Service Binding is not live. Do not infer authorization readiness from this helper alone. No Access policy, Service Token, secret, Cloudflare binding, route, D1 migration, Worker deployment, or Scheduler/dispatch state changed. Public GROUP Access remains default-deny and AMPHETAMIN is unchanged.
 
 **Verification:** the focused ES256 test cases cover valid assertion, forged caller marker, AMPHETAMIN subject, wrong audience, expiry, request-digest mismatch, idempotency-key mismatch, algorithm substitution, and invalid signature. The focused Node test was run locally on Node 22 and passed (5 top-level tests). This is not a full repository suite or Cloudflare Workers runtime verification.
+
+
+
+## I0.26.1 — strict ES256 Worker JWT verifier core (2026-11-28)
+
+Implemented an isolated `src/worker-jwt.mjs` verification primitive and `tests/worker-jwt.test.mjs`. It is not wired to GROUP routes or a deployed runtime.
+
+The verifier requires compact ES256 JWTs, exact JOSE header parameters, a configured `kid) mapped to a P-256 public verification key, cryptographic signature success, exact issuer/audience, valid subject/JTI/registration epoch, integer time claims, bounded skew and a maximum 300-second lifetime. It rejects algorithm substitution/`none`, malformed or non-canonical JOSE segments, unsupported header parameters, unknown key IDs, invalid signatures, issuer/audience mismatch, invalid time ordering, expired/not-yet-valid/future-issued credentials, revoked/inactive JTI records, stale epochs, and mismatched worker/JTI/key metadata. A durable credential resolver is mandatory and must match all identity fields exactly.
+
+**Test evidence:** `node --test tests/worker-jwt.test.mjs) was run in an isolated local working copy on Node 22.16.0: 13 passed, 0 failed. The complete repository suite and Cloudflare runtime were not run. The existing Provisioner assertion verifier is separate and is not reused for Worker JWTs.
+
+**Remaining security gates:** the resolver is not yet connected to D1; public verification keys are not configured; the private ES256 signing key is not provisioned; issuer/signing code and rotation lifecycle are not implemented. No route, secret, binding, Access policy, Cloudflare resource, or deployment changed. Enrollment/heartbeat, Worker eligibility, Scheduler and dispatch remain disabled.
+
+Next: implement and test the D1-backed credential resolver and key-set loading contract, followed by a separate GROUP-only signing primitive and key rotation tests. Do not enable routes until durable revocation/epoch checks and production-compatible D1 behavior are verified.
