@@ -106,3 +106,8 @@ PR #10 adds the private approval API and the D1 migration `0003_compute_approval
 ## I0.26.4 — production D1 schema inventory
 
 The deployed GROUP Worker `DB` binding was resolved read-only to production database `symbiotyc-group-compute-state`. Its migration ledger contains only 0001–0003. Worker Registry tables and heartbeat-fencing triggers are absent; migrations 0004–0006 are not applied. The I0.26.2/3 credential resolver therefore cannot run against the currently bound production D1. No D1 changes were made. See [runtime contract](docs/provisioner-runtime-contract.md#i0264--read-only-production-d1-schema-inventory-2026-11-28) and [F2.3 transaction gate](docs/worker-heartbeat-transaction-boundary.md#i0264--read-only-production-d1-schema-inventory-2026-11-28).
+
+
+## I0.26.5 — production D1 migration rollout review
+
+**HOLD — migrations 0004–0006 are not approved for production application.** Source review found three blockers: 0005 heartbeat triggers omit the independent Worker `revoked_at` guard; 0004's one-unconsumed-challenge index lets expired challenges block replacement; and 0006 lacks immutable idempotency-claim/state-transition guards. See [runtime contract](docs/provisioner-runtime-contract.md#i0265--production-d1-migration-rollout-review-2026-11-28), [F2.3 transaction gate](docs/worker-heartbeat-transaction-boundary.md#i0265--production-d1-migration-rollout-review-2026-11-28), and [identity contract](docs/worker-identity-and-enrollment-contract.md#i0265-migration-review-findings). No production D1 changes were made.
